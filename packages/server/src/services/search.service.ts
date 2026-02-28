@@ -34,7 +34,7 @@ export class SearchService {
       logger.warn({ err: queueError }, 'Queue unavailable, processing search directly');
       // Process synchronously if Redis is not available
       processSearchJob({ searchQueryId: searchQuery.id }).catch((err) =>
-        logger.error('Direct search processing error:', err)
+        logger.error({ err }, 'Direct search processing error')
       );
     }
 
