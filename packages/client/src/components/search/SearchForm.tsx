@@ -1,6 +1,5 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { TripType, CabinClass } from '@flightselect/shared';
+import { TripType } from '@flightselect/shared';
 import { AirportInput } from './AirportInput';
 import { DatePicker } from './DatePicker';
 import { PassengerSelector } from './PassengerSelector';

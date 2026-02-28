@@ -1,4 +1,3 @@
-import { CabinClass } from '@flightselect/shared';
 import { IScraper, ScraperSearchParams, ScrapedFlight } from './scraper.interface';
 import { generatePrice } from '../utils/pricing';
 import { getLayoverOptions } from '../utils/airports';

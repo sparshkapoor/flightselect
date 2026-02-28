@@ -34,7 +34,10 @@ export async function processComparisonJob(data: ComparisonJobData): Promise<voi
   const returnFlights = allFlights.slice(0, Math.min(3, allFlights.length));
 
   const bestRoundTrip = outboundFlights[0];
-  const roundTripPrice = bestRoundTrip ? Number(bestRoundTrip.price) * 1.8 : 0; // RT pricing heuristic
+  // Round-trip heuristic: airlines typically price RT at ~1.8× the one-way outbound fare,
+  // accounting for the return leg discount (true RT is usually cheaper than 2× one-way).
+  // This multiplier is used only when we don't have explicit RT pricing from a scraper.
+  const roundTripPrice = bestRoundTrip ? Number(bestRoundTrip.price) * 1.8 : 0;
 
   // Best one-way combo: cheapest outbound + cheapest return (potentially different airlines)
   const bestOutbound = outboundFlights[0];

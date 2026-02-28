@@ -21,7 +21,8 @@ export class MockAIService implements IAIService {
         ? RecommendedOption.ROUND_TRIP
         : RecommendedOption.ONE_WAY;
 
-    const savingsPercent = ((savings / Math.max(input.roundTripTotalPrice, input.oneWayTotalPrice)) * 100).toFixed(1);
+    const denominator = Math.max(input.roundTripTotalPrice, input.oneWayTotalPrice);
+    const savingsPercent = denominator > 0 ? ((savings / denominator) * 100).toFixed(1) : '0.0';
 
     const reasoning: string[] = [];
     const warnings: string[] = [];

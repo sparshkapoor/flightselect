@@ -17,7 +17,7 @@ export function AirportInput({ value, onChange, placeholder = 'Airport', label }
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (debouncedQuery.length >= 1) {
+    if (debouncedQuery.length >= 2) {
       setResults(searchAirports(debouncedQuery));
       setOpen(true);
     } else {
