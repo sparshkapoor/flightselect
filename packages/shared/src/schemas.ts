@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { CabinClass, TripType } from './enums';
 
-export const IATACodeSchema = z.string().length(3).toUpperCase();
+export const IATACodeSchema = z.string().length(3).transform((val) => val.toUpperCase());
 
 export const SearchRequestSchema = z.object({
   originAirport: IATACodeSchema,

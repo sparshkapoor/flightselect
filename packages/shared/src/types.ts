@@ -4,6 +4,9 @@ import { CabinClass, TripType, RecommendedOption } from './enums';
 export type IATACode = string & { readonly __brand: 'IATACode' };
 
 export function toIATACode(code: string): IATACode {
+  if (!/^[A-Za-z]{3}$/.test(code)) {
+    throw new Error(`Invalid IATA code: "${code}". Must be exactly 3 letters.`);
+  }
   return code.toUpperCase() as IATACode;
 }
 
