@@ -1,0 +1,114 @@
+// This is your Prisma schema file
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CabinClass {
+  ECONOMY
+  PREMIUM_ECONOMY
+  BUSINESS
+  FIRST
+}
+
+enum TripType {
+  ONE_WAY
+  ROUND_TRIP
+}
+
+enum RecommendedOption {
+  ROUND_TRIP
+  ONE_WAY
+  MIXED
+}
+
+model User {
+  id                String        @id @default(uuid())
+  email             String        @unique
+  displayName       String?
+  preferredCurrency String        @default("USD")
+  homeAirport       String?
+  createdAt         DateTime      @default(now())
+  searchQueries     SearchQuery[]
+  savedSearches     SavedSearch[]
+}
+
+model SearchQuery {
+  id                          String        @id @default(uuid())
+  originAirport               String
+  destinationAirport          String
+  departureDate               DateTime
+  returnDate                  DateTime?
+  tripType                    TripType
+  passengers                  Int           @default(1)
+  cabinClass                  CabinClass    @default(ECONOMY)
+  maxLayovers                 Int?
+  maxTotalDurationMinutes     Int?
+  preferredLayoverAirports    String[]
+  avoidedAirlines             String[]
+  preferredAirlines           String[]
+  flexibleDates               Boolean       @default(false)
+  flexibleDateRangeDays       Int?
+  createdAt                   DateTime      @default(now())
+  userId                      String?
+  user                        User?         @relation(fields: [userId], references: [id])
+  flights                     Flight[]
+  comparisons                 Comparison[]
+  savedSearches               SavedSearch[]
+}
+
+model Flight {
+  id                     String      @id @default(uuid())
+  airline                String
+  flightNumber           String
+  departureAirport       String
+  arrivalAirport         String
+  departureTime          DateTime
+  arrivalTime            DateTime
+  durationMinutes        Int
+  price                  Decimal
+  currency               String      @default("USD")
+  cabinClass             CabinClass
+  isLayover              Boolean     @default(false)
+  layoverAirport         String?
+  layoverDurationMinutes Int?
+  source                 String
+  scrapedAt              DateTime
+  rawData                Json?
+  searchQueryId          String
+  searchQuery            SearchQuery @relation(fields: [searchQueryId], references: [id])
+}
+
+model Comparison {
+  id                    String            @id @default(uuid())
+  searchQueryId         String
+  searchQuery           SearchQuery       @relation(fields: [searchQueryId], references: [id])
+  roundTripFlightIds    String[]
+  oneWayOutboundFlightIds String[]
+  oneWayReturnFlightIds String[]
+  roundTripTotalPrice   Decimal
+  oneWayTotalPrice      Decimal
+  priceDifference       Decimal
+  recommendedOption     RecommendedOption
+  aiAnalysis            String?
+  aiAnalysisGeneratedAt DateTime?
+  createdAt             DateTime          @default(now())
+}
+
+model SavedSearch {
+  id                   String      @id @default(uuid())
+  userId               String
+  user                 User        @relation(fields: [userId], references: [id])
+  searchQueryId        String
+  searchQuery          SearchQuery @relation(fields: [searchQueryId], references: [id])
+  nickname             String?
+  priceAlertEnabled    Boolean     @default(false)
+  priceAlertThreshold  Decimal?
+  createdAt            DateTime    @default(now())
+}
