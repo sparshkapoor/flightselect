@@ -34,7 +34,7 @@ async function bootstrap(): Promise<void> {
       logger.info(`FlightSelect server running on port ${env.PORT} (${env.NODE_ENV})`);
     });
   } catch (error) {
-    logger.error('Failed to start server:', error);
+    logger.error({ err: error }, 'Failed to start server');
     process.exit(1);
   }
 }

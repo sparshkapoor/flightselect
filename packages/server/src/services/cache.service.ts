@@ -10,7 +10,7 @@ export class CacheService {
       if (!value) return null;
       return JSON.parse(value) as T;
     } catch (error) {
-      logger.warn(`Cache get error for key ${key}:`, error);
+      logger.warn({ err: error }, `Cache get error for key ${key}`);
       return null;
     }
   }
@@ -19,7 +19,7 @@ export class CacheService {
     try {
       await redis.setex(key, ttl, JSON.stringify(value));
     } catch (error) {
-      logger.warn(`Cache set error for key ${key}:`, error);
+      logger.warn({ err: error }, `Cache set error for key ${key}`);
     }
   }
 
@@ -27,7 +27,7 @@ export class CacheService {
     try {
       await redis.del(key);
     } catch (error) {
-      logger.warn(`Cache del error for key ${key}:`, error);
+      logger.warn({ err: error }, `Cache del error for key ${key}`);
     }
   }
 

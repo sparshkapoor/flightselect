@@ -20,7 +20,7 @@ export async function connectDatabase(): Promise<void> {
     await prisma.$connect();
     logger.info('Database connected successfully');
   } catch (error) {
-    logger.error('Failed to connect to database:', error);
+    logger.error({ err: error }, 'Failed to connect to database');
     throw error;
   }
 }

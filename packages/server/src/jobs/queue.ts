@@ -50,7 +50,7 @@ export async function createSearchWorker(
   });
 
   worker.on('failed', (job, err) => {
-    logger.error(`Search job ${job?.id} failed:`, err);
+    logger.error({ err, jobId: job?.id }, 'Search job failed');
   });
 
   return worker;
