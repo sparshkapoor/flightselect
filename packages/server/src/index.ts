@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import { env } from './config/env';
 import { connectDatabase } from './config/database';
@@ -5,6 +6,8 @@ import { errorMiddleware } from './middleware/error.middleware';
 import { apiRateLimit } from './middleware/rateLimit.middleware';
 import routes from './routes';
 import { logger } from './utils/logger';
+import { createSearchWorker } from './jobs/queue';
+import { processSearchJob } from './jobs/search.job';
 
 const app = express();
 
@@ -30,6 +33,8 @@ app.use(errorMiddleware);
 async function bootstrap(): Promise<void> {
   try {
     await connectDatabase();
+    await createSearchWorker((job) => processSearchJob(job.data as { searchQueryId: string }));
+    logger.info('Search worker started');
     app.listen(parseInt(env.PORT), () => {
       logger.info(`FlightSelect server running on port ${env.PORT} (${env.NODE_ENV})`);
     });

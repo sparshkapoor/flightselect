@@ -1,5 +1,6 @@
 import { IScraper } from './scraper.interface';
 import { MockScraper } from './mock.scraper';
+import { googleFlightsScraper } from './google-flights';
 
 /**
  * ScraperFactory creates scraper instances by source name.
@@ -25,4 +26,9 @@ export class ScraperFactory {
   static registerScraper(scraper: IScraper): void {
     ScraperFactory.scrapers.set(scraper.source, scraper);
   }
+  
+  export const scrapers = {
+    googleFlights: googleFlightsScraper,
+  };
+
 }

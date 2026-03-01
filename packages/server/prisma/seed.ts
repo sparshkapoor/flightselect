@@ -1,7 +1,7 @@
-import { PrismaClient, CabinClass, TripType } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { MockScraper } from '../src/scrapers/mock.scraper';
 import { MockAIService } from '../src/services/ai/ai.service';
-import { RecommendedOption } from '@flightselect/shared';
+import { CabinClass, TripType, RecommendedOption } from '@flightselect/shared';
 
 const prisma = new PrismaClient();
 const scraper = new MockScraper();
@@ -176,7 +176,7 @@ async function main() {
             layoverDurationMinutes: f.layoverDurationMinutes,
             source: f.source,
             scrapedAt: f.scrapedAt,
-            rawData: f.rawData ?? undefined,
+            rawData: f.rawData ? (f.rawData as object) : undefined,
           },
         })
       )

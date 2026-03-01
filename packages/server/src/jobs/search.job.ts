@@ -1,6 +1,6 @@
 import { prisma } from '../config/database';
 import { ScraperFactory } from '../scrapers/scraper.factory';
-import { comparisonQueue } from './queue';
+import { processComparisonJob } from './comparison.job';
 import { logger } from '../utils/logger';
 import { CabinClass } from '@flightselect/shared';
 
@@ -66,6 +66,11 @@ export async function processSearchJob(data: SearchJobData): Promise<void> {
     logger.info(`Saved ${allFlights.length} flights for query: ${searchQueryId}`);
   }
 
-  // Queue comparison job
-  await comparisonQueue.add('build-comparison', { searchQueryId });
+  // Process comparison directly (no queue needed — it's fast)
+  try {
+    await processComparisonJob({ searchQueryId });
+    logger.info(`Comparison built for query: ${searchQueryId}`);
+  } catch (err) {
+    logger.error({ err }, 'Comparison processing error');
+  }
 }

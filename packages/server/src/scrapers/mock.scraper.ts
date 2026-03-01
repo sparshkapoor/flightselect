@@ -41,6 +41,69 @@ function generateFlightDuration(international: boolean, hasLayover: boolean): nu
   return baseDuration + layoverExtra;
 }
 
+function generateFlights(
+  origin: string,
+  destination: string,
+  date: Date,
+  cabinClass: string,
+  count: number,
+): ScrapedFlight[] {
+  const international = isInternational(origin, destination);
+  const layoverOptions = getLayoverOptions(origin, destination);
+  const flights: ScrapedFlight[] = [];
+  const scrapedAt = new Date();
+
+  for (let i = 0; i < count; i++) {
+    const airline = randomElement(AIRLINES);
+    const airlineCode = AIRLINE_CODES[airline];
+    const flightNumber = `${airlineCode}${randomInt(100, 9999)}`;
+    const layoverCount = randomElement([0, 0, 1, 1, 2]);
+    const hasLayover = layoverCount > 0;
+    const durationMinutes = generateFlightDuration(international, hasLayover);
+    const price = generatePrice(international, cabinClass);
+
+    const depOffset = randomInt(0, 16 * 60);
+    const departureTime = new Date(date);
+    departureTime.setMinutes(departureTime.getMinutes() + depOffset);
+
+    const arrivalTime = new Date(departureTime);
+    arrivalTime.setMinutes(arrivalTime.getMinutes() + durationMinutes);
+
+    let layoverAirport: string | null = null;
+    let layoverDurationMinutes: number | null = null;
+
+    if (hasLayover && layoverOptions.length > 0) {
+      layoverAirport = randomElement(layoverOptions);
+      layoverDurationMinutes = randomInt(45, 360);
+    }
+
+    flights.push({
+      airline,
+      flightNumber,
+      departureAirport: origin,
+      arrivalAirport: destination,
+      departureTime,
+      arrivalTime,
+      durationMinutes,
+      price,
+      currency: 'USD',
+      cabinClass,
+      isLayover: hasLayover,
+      layoverAirport,
+      layoverDurationMinutes,
+      source: 'mock',
+      scrapedAt,
+      rawData: {
+        mock: true,
+        layoverCount,
+        international,
+      },
+    });
+  }
+
+  return flights;
+}
+
 export class MockScraper implements IScraper {
   readonly source = 'mock';
 
@@ -49,63 +112,30 @@ export class MockScraper implements IScraper {
   }
 
   async search(params: ScraperSearchParams): Promise<ScrapedFlight[]> {
-    // Simulate network latency
     await new Promise((resolve) => setTimeout(resolve, 100 + Math.random() * 400));
 
-    const count = randomInt(5, 20);
-    const international = isInternational(params.originAirport, params.destinationAirport);
-    const layoverOptions = getLayoverOptions(params.originAirport, params.destinationAirport);
-    const flights: ScrapedFlight[] = [];
-    const scrapedAt = new Date();
+    const outboundCount = randomInt(5, 20);
+    const outboundFlights = generateFlights(
+      params.originAirport,
+      params.destinationAirport,
+      params.departureDate,
+      params.cabinClass,
+      outboundCount,
+    );
 
-    for (let i = 0; i < count; i++) {
-      const airline = randomElement(AIRLINES);
-      const airlineCode = AIRLINE_CODES[airline];
-      const flightNumber = `${airlineCode}${randomInt(100, 9999)}`;
-      const layoverCount = randomElement([0, 0, 1, 1, 2]); // weighted toward direct/1-stop
-      const hasLayover = layoverCount > 0;
-      const durationMinutes = generateFlightDuration(international, hasLayover);
-      const price = generatePrice(international, params.cabinClass);
-
-      const depOffset = randomInt(0, 16 * 60); // departure within 16 hours of base date
-      const departureTime = new Date(params.departureDate);
-      departureTime.setMinutes(departureTime.getMinutes() + depOffset);
-
-      const arrivalTime = new Date(departureTime);
-      arrivalTime.setMinutes(arrivalTime.getMinutes() + durationMinutes);
-
-      let layoverAirport: string | null = null;
-      let layoverDurationMinutes: number | null = null;
-
-      if (hasLayover && layoverOptions.length > 0) {
-        layoverAirport = randomElement(layoverOptions);
-        layoverDurationMinutes = randomInt(45, 360);
-      }
-
-      flights.push({
-        airline,
-        flightNumber,
-        departureAirport: params.originAirport,
-        arrivalAirport: params.destinationAirport,
-        departureTime,
-        arrivalTime,
-        durationMinutes,
-        price,
-        currency: 'USD',
-        cabinClass: params.cabinClass,
-        isLayover: hasLayover,
-        layoverAirport,
-        layoverDurationMinutes,
-        source: this.source,
-        scrapedAt,
-        rawData: {
-          mock: true,
-          layoverCount,
-          international,
-        },
-      });
+    // Generate return flights if returnDate exists
+    if (params.returnDate) {
+      const returnCount = randomInt(5, 20);
+      const returnFlights = generateFlights(
+        params.destinationAirport,
+        params.originAirport,
+        params.returnDate,
+        params.cabinClass,
+        returnCount,
+      );
+      return [...outboundFlights, ...returnFlights];
     }
 
-    return flights;
+    return outboundFlights;
   }
 }

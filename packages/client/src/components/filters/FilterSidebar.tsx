@@ -66,6 +66,49 @@ export function FilterSidebar({ flights }: FilterSidebarProps) {
         </div>
       </div>
 
+      {/* Max Duration */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Max Flight Duration: {store.maxDurationMinutes ? `${Math.floor(store.maxDurationMinutes / 60)}h ${store.maxDurationMinutes % 60}m` : 'Any'}
+        </label>
+        <input
+          type="range"
+          min={60}
+          max={1440}
+          step={30}
+          value={store.maxDurationMinutes ?? 1440}
+          onChange={(e) => {
+            const v = Number(e.target.value);
+            store.setMaxDurationMinutes(v === 1440 ? undefined : v);
+          }}
+          className="w-full accent-brand-600"
+        />
+        <div className="flex justify-between text-xs text-gray-400 mt-1">
+          <span>1h</span>
+          <span>24h</span>
+        </div>
+      </div>
+
+      {/* Departure time */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Departure Time</label>
+        <div className="flex items-center gap-2">
+          <input
+            type="time"
+            value={store.departureTimeStart ?? ''}
+            onChange={(e) => store.setDepartureTimeStart(e.target.value || undefined)}
+            className="flex-1 text-xs border border-gray-300 rounded px-2 py-1"
+          />
+          <span className="text-xs text-gray-400">to</span>
+          <input
+            type="time"
+            value={store.departureTimeEnd ?? ''}
+            onChange={(e) => store.setDepartureTimeEnd(e.target.value || undefined)}
+            className="flex-1 text-xs border border-gray-300 rounded px-2 py-1"
+          />
+        </div>
+      </div>
+
       {/* Airlines */}
       {airlines.length > 0 && (
         <div>

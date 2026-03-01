@@ -24,31 +24,61 @@ export async function processComparisonJob(data: ComparisonJobData): Promise<voi
     return;
   }
 
-  // Sort flights by price for best options
-  const sortedFlights = [...flights].sort((a, b) => Number(a.price) - Number(b.price));
-  const directFlights = sortedFlights.filter((f) => !f.isLayover);
-  const allFlights = directFlights.length > 0 ? directFlights : sortedFlights;
+  // Split flights into outbound (origin→dest) and return (dest→origin)
+  const outboundFlights = flights
+    .filter((f) => f.departureAirport === searchQuery.originAirport && f.arrivalAirport === searchQuery.destinationAirport)
+    .sort((a, b) => Number(a.price) - Number(b.price));
 
-  // Best round-trip: cheapest outbound + return combined
-  const outboundFlights = allFlights.slice(0, Math.min(3, allFlights.length));
-  const returnFlights = allFlights.slice(0, Math.min(3, allFlights.length));
+  const returnFlights = flights
+    .filter((f) => f.departureAirport === searchQuery.destinationAirport && f.arrivalAirport === searchQuery.originAirport)
+    .sort((a, b) => Number(a.price) - Number(b.price));
 
-  const bestRoundTrip = outboundFlights[0];
-  // Round-trip heuristic: airlines typically price RT at ~1.8× the one-way outbound fare,
-  // accounting for the return leg discount (true RT is usually cheaper than 2× one-way).
-  // This multiplier is used only when we don't have explicit RT pricing from a scraper.
-  const roundTripPrice = bestRoundTrip ? Number(bestRoundTrip.price) * 1.8 : 0;
+  // If no return flights, we can't do a proper comparison
+  if (returnFlights.length === 0) {
+    logger.warn(`No return flights found for comparison: ${searchQueryId}`);
+    // Still create a basic comparison with outbound only
+    const bestOutbound = outboundFlights[0];
+    if (!bestOutbound) return;
 
-  // Best one-way combo: cheapest outbound + cheapest return (potentially different airlines)
-  const bestOutbound = outboundFlights[0];
-  const bestReturn = returnFlights[Math.min(1, returnFlights.length - 1)] ?? returnFlights[0];
-  const oneWayPrice = bestOutbound && bestReturn
-    ? Number(bestOutbound.price) + Number(bestReturn.price)
-    : 0;
+    const roundTripPrice = Number(bestOutbound.price) * 1.8;
+    const oneWayPrice = Number(bestOutbound.price);
+
+    await prisma.comparison.create({
+      data: {
+        searchQueryId,
+        roundTripFlightIds: [bestOutbound.id],
+        oneWayOutboundFlightIds: [bestOutbound.id],
+        oneWayReturnFlightIds: [],
+        roundTripTotalPrice: roundTripPrice,
+        oneWayTotalPrice: oneWayPrice,
+        priceDifference: roundTripPrice - oneWayPrice,
+        recommendedOption: RecommendedOption.ONE_WAY,
+        aiAnalysis: null,
+        aiAnalysisGeneratedAt: null,
+      },
+    });
+    return;
+  }
+
+  // Best round-trip: cheapest outbound + cheapest return on SAME airline (or cheapest combo)
+  const bestRoundTripOutbound = outboundFlights[0];
+  const bestRoundTripReturn = returnFlights.find((r) => r.airline === bestRoundTripOutbound.airline) ?? returnFlights[0];
+  const roundTripPrice = (Number(bestRoundTripOutbound.price) + Number(bestRoundTripReturn.price)) * 0.9; // 10% RT discount
+
+  // Best one-way combo: cheapest outbound + cheapest return (any airline)
+  const bestOneWayOutbound = outboundFlights[0];
+  const bestOneWayReturn = returnFlights[0];
+  const oneWayPrice = Number(bestOneWayOutbound.price) + Number(bestOneWayReturn.price);
 
   const priceDifference = roundTripPrice - oneWayPrice;
   const recommendedOption =
     roundTripPrice <= oneWayPrice ? RecommendedOption.ROUND_TRIP : RecommendedOption.ONE_WAY;
+
+  // Top outbound + return for round trip display
+  const topRoundTripIds = [
+    bestRoundTripOutbound.id,
+    bestRoundTripReturn.id,
+  ];
 
   // Generate AI analysis
   const aiAnalysis = await aiService.analyzeComparison({
@@ -56,8 +86,8 @@ export async function processComparisonJob(data: ComparisonJobData): Promise<voi
     roundTripTotalPrice: roundTripPrice,
     oneWayTotalPrice: oneWayPrice,
     priceDifference,
-    roundTripFlightCount: outboundFlights.length,
-    oneWayFlightCount: outboundFlights.length + returnFlights.length,
+    roundTripFlightCount: 2,
+    oneWayFlightCount: 2,
     originAirport: searchQuery.originAirport,
     destinationAirport: searchQuery.destinationAirport,
     departureDate: searchQuery.departureDate.toISOString(),
@@ -69,9 +99,9 @@ export async function processComparisonJob(data: ComparisonJobData): Promise<voi
   await prisma.comparison.create({
     data: {
       searchQueryId,
-      roundTripFlightIds: outboundFlights.map((f) => f.id),
-      oneWayOutboundFlightIds: bestOutbound ? [bestOutbound.id] : [],
-      oneWayReturnFlightIds: bestReturn ? [bestReturn.id] : [],
+      roundTripFlightIds: topRoundTripIds,
+      oneWayOutboundFlightIds: [bestOneWayOutbound.id],
+      oneWayReturnFlightIds: [bestOneWayReturn.id],
       roundTripTotalPrice: roundTripPrice,
       oneWayTotalPrice: oneWayPrice,
       priceDifference,
@@ -81,5 +111,5 @@ export async function processComparisonJob(data: ComparisonJobData): Promise<voi
     },
   });
 
-  logger.info(`Comparison created for query: ${searchQueryId}`);
+  logger.info(`Comparison created for query: ${searchQueryId} (${outboundFlights.length} outbound, ${returnFlights.length} return flights)`);
 }
