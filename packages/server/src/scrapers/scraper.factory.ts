@@ -9,6 +9,7 @@ import { googleFlightsScraper } from './google-flights';
 export class ScraperFactory {
   private static scrapers: Map<string, IScraper> = new Map([
     ['mock', new MockScraper()],
+    ['google-flights', googleFlightsScraper],
   ]);
 
   static getScraper(source: string): IScraper {
@@ -27,8 +28,4 @@ export class ScraperFactory {
     ScraperFactory.scrapers.set(scraper.source, scraper);
   }
   
-  export const scrapers = {
-    googleFlights: googleFlightsScraper,
-  };
-
 }
