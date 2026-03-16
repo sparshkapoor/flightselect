@@ -5,7 +5,7 @@ import { FlightCard } from '../results/FlightCard';
 import { SavingsBadge } from './SavingsBadge';
 import { PriceComparisonChart } from './PriceComparisonChart';
 import { ComparisonTable } from './ComparisonTable';
-import { AIInsightsPanel } from './AIInsightsPanel';
+
 
 interface ComparisonViewProps {
   comparison: Comparison;
@@ -15,9 +15,9 @@ interface ComparisonViewProps {
 }
 
 const RECOMMENDATION_LABELS: Record<RecommendedOption, string> = {
-  [RecommendedOption.ROUND_TRIP]: '✈ Book Round Trip',
-  [RecommendedOption.ONE_WAY]: '🔀 Book Two One-Ways',
-  [RecommendedOption.MIXED]: '🔄 Mixed Strategy',
+  [RecommendedOption.ROUND_TRIP]: 'Same Airline Wins',
+  [RecommendedOption.ONE_WAY]: 'Mix & Match Saves',
+  [RecommendedOption.MIXED]: 'Mixed Strategy',
 };
 
 export function ComparisonView({
@@ -30,7 +30,7 @@ export function ComparisonView({
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Round Trip vs. One-Way</h2>
+        <h2 className="text-2xl font-bold text-gray-900">Same Airline vs. Best Mix</h2>
         <span className="bg-brand-100 text-brand-700 px-4 py-1.5 rounded-full font-semibold text-sm">
           {RECOMMENDATION_LABELS[comparison.recommendedOption]}
         </span>
@@ -40,7 +40,7 @@ export function ComparisonView({
       <div className="grid grid-cols-3 gap-4">
         <div className={`card text-center ${comparison.recommendedOption === RecommendedOption.ROUND_TRIP ? 'ring-2 ring-green-400' : ''}`}>
           <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-            Best Round Trip
+            Same Airline
           </div>
           <PriceTag
             amount={Number(comparison.roundTripTotalPrice)}
@@ -59,7 +59,7 @@ export function ComparisonView({
 
         <div className={`card text-center ${comparison.recommendedOption === RecommendedOption.ONE_WAY ? 'ring-2 ring-green-400' : ''}`}>
           <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-            Best One-Way Combo
+            Best Mix
           </div>
           <PriceTag
             amount={Number(comparison.oneWayTotalPrice)}
@@ -98,7 +98,7 @@ export function ComparisonView({
       {/* Flight details */}
       <div className="grid grid-cols-2 gap-6">
         <div>
-          <h3 className="font-semibold text-gray-700 mb-3">Round-Trip Flights</h3>
+          <h3 className="font-semibold text-gray-700 mb-3">Same Airline</h3>
           <div className="space-y-2">
             {roundTripFlights.map((f) => (
               <FlightCard key={f.id} flight={f} />
@@ -106,7 +106,7 @@ export function ComparisonView({
           </div>
         </div>
         <div>
-          <h3 className="font-semibold text-gray-700 mb-3">One-Way Options</h3>
+          <h3 className="font-semibold text-gray-700 mb-3">Best Mix</h3>
           <div className="space-y-2">
             {[...oneWayOutboundFlights, ...oneWayReturnFlights].map((f) => (
               <FlightCard key={f.id} flight={f} />
@@ -114,9 +114,6 @@ export function ComparisonView({
           </div>
         </div>
       </div>
-
-      {/* AI Insights */}
-      <AIInsightsPanel aiAnalysis={comparison.aiAnalysis} />
     </div>
   );
 }

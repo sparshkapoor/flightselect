@@ -60,12 +60,38 @@ export async function processComparisonJob(data: ComparisonJobData): Promise<voi
     return;
   }
 
-  // Best round-trip: cheapest outbound + cheapest return on SAME airline (or cheapest combo)
-  const bestRoundTripOutbound = outboundFlights[0];
-  const bestRoundTripReturn = returnFlights.find((r) => r.airline === bestRoundTripOutbound.airline) ?? returnFlights[0];
-  const roundTripPrice = (Number(bestRoundTripOutbound.price) + Number(bestRoundTripReturn.price)) * 0.9; // 10% RT discount
+  // "Round trip" = cheapest same-airline outbound + return combo
+  // "One-way combo" = cheapest outbound + cheapest return regardless of airline
+  // This shows whether sticking with one airline saves money vs mixing carriers.
 
-  // Best one-way combo: cheapest outbound + cheapest return (any airline)
+  // Find best same-airline combo
+  let bestSameAirlineOutbound = outboundFlights[0];
+  let bestSameAirlineReturn = returnFlights[0];
+  let bestSameAirlinePrice = Infinity;
+
+  for (const out of outboundFlights) {
+    const matchingReturn = returnFlights.find((r) => r.airline === out.airline);
+    if (matchingReturn) {
+      const combo = Number(out.price) + Number(matchingReturn.price);
+      if (combo < bestSameAirlinePrice) {
+        bestSameAirlinePrice = combo;
+        bestSameAirlineOutbound = out;
+        bestSameAirlineReturn = matchingReturn;
+      }
+    }
+  }
+
+  // If no same-airline combo found, fall back to cheapest outbound + return
+  const hasSameAirline = bestSameAirlinePrice < Infinity;
+  if (!hasSameAirline) {
+    bestSameAirlinePrice = Number(outboundFlights[0].price) + Number(returnFlights[0].price);
+    bestSameAirlineOutbound = outboundFlights[0];
+    bestSameAirlineReturn = returnFlights[0];
+  }
+
+  const roundTripPrice = bestSameAirlinePrice;
+
+  // Best mix-and-match: cheapest outbound + cheapest return (any airline)
   const bestOneWayOutbound = outboundFlights[0];
   const bestOneWayReturn = returnFlights[0];
   const oneWayPrice = Number(bestOneWayOutbound.price) + Number(bestOneWayReturn.price);
@@ -76,8 +102,8 @@ export async function processComparisonJob(data: ComparisonJobData): Promise<voi
 
   // Top outbound + return for round trip display
   const topRoundTripIds = [
-    bestRoundTripOutbound.id,
-    bestRoundTripReturn.id,
+    bestSameAirlineOutbound.id,
+    bestSameAirlineReturn.id,
   ];
 
   // Generate AI analysis

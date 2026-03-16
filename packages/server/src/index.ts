@@ -33,8 +33,14 @@ app.use(errorMiddleware);
 async function bootstrap(): Promise<void> {
   try {
     await connectDatabase();
-    await createSearchWorker((job) => processSearchJob(job.data as { searchQueryId: string }));
-    logger.info('Search worker started');
+
+    try {
+      await createSearchWorker((job) => processSearchJob(job.data as { searchQueryId: string }));
+      logger.info('Search worker started');
+    } catch (workerError) {
+      logger.warn({ err: workerError }, 'Search worker failed to start — searches will process directly without queue');
+    }
+
     app.listen(parseInt(env.PORT), () => {
       logger.info(`FlightSelect server running on port ${env.PORT} (${env.NODE_ENV})`);
     });

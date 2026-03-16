@@ -60,8 +60,8 @@ export function ComparisonTable({
       <thead>
         <tr className="text-xs uppercase text-gray-400 border-b">
           <th className="text-left py-2">Attribute</th>
-          <th className="text-center py-2">Round Trip</th>
-          <th className="text-center py-2">One-Way Combo</th>
+          <th className="text-center py-2">Same Airline</th>
+          <th className="text-center py-2">Best Mix</th>
         </tr>
       </thead>
       <tbody>

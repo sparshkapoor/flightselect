@@ -27,9 +27,12 @@ export interface Flight {
   layoverDurationMinutes: number | null;
   source: string;
   scrapedAt: string;
+  bookingUrl: string | null;
   rawData?: Record<string, unknown> | null;
   searchQueryId: string;
 }
+
+export type SearchStatus = 'PENDING' | 'COMPLETED' | 'FAILED';
 
 export interface SearchQuery {
   id: string;
@@ -47,6 +50,7 @@ export interface SearchQuery {
   preferredAirlines: string[] | null;
   flexibleDates: boolean;
   flexibleDateRangeDays: number | null;
+  status: SearchStatus;
   createdAt: string;
   userId: string | null;
 }

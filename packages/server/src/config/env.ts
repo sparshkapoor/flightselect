@@ -9,6 +9,7 @@ const envSchema = z.object({
   AI_SERVICE_MODEL: z.string().default('claude-3-opus-20240229'),
   AMADEUS_API_KEY: z.string().optional(),
   AMADEUS_API_SECRET: z.string().optional(),
+  SERPAPI_API_KEY: z.string().optional(),
 });
 
 const parseResult = envSchema.safeParse(process.env);

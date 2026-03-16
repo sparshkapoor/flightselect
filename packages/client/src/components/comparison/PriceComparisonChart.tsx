@@ -9,8 +9,8 @@ interface PriceComparisonChartProps {
 
 export function PriceComparisonChart({ roundTripTotal, oneWayTotal, currency = 'USD' }: PriceComparisonChartProps) {
   const data = [
-    { name: 'Round Trip', price: roundTripTotal },
-    { name: 'One-Way Combo', price: oneWayTotal },
+    { name: 'Same Airline', price: roundTripTotal },
+    { name: 'Best Mix', price: oneWayTotal },
   ];
 
   const minPrice = Math.min(roundTripTotal, oneWayTotal);

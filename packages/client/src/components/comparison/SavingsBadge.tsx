@@ -10,9 +10,9 @@ export function SavingsBadge({ priceDifference, recommendedOption }: SavingsBadg
   const savings = Math.abs(priceDifference);
   const label =
     recommendedOption === RecommendedOption.ROUND_TRIP
-      ? 'Round-trip saves'
+      ? 'Same Airline saves'
       : recommendedOption === RecommendedOption.ONE_WAY
-      ? 'One-way saves'
+      ? 'Mix & Match saves'
       : 'Mixed strategy saves';
 
   return (

@@ -22,6 +22,12 @@ enum TripType {
   ROUND_TRIP
 }
 
+enum SearchStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
 enum RecommendedOption {
   ROUND_TRIP
   ONE_WAY
@@ -55,6 +61,7 @@ model SearchQuery {
   preferredAirlines           String[]
   flexibleDates               Boolean       @default(false)
   flexibleDateRangeDays       Int?
+  status                      SearchStatus  @default(PENDING)
   createdAt                   DateTime      @default(now())
   userId                      String?
   user                        User?         @relation(fields: [userId], references: [id])
@@ -80,6 +87,7 @@ model Flight {
   layoverDurationMinutes Int?
   source                 String
   scrapedAt              DateTime
+  bookingUrl             String?
   rawData                Json?
   searchQueryId          String
   searchQuery            SearchQuery @relation(fields: [searchQueryId], references: [id])

@@ -99,3 +99,104 @@ First session. The repo was a generated starter project from GitHub Copilot. The
 4. **Min price filter** — In store but not in UI.
 5. **Max layover duration filter** — In store but not in UI.
 6. **Docker `version` attribute warning** — Cosmetic, can remove `version: '3.8'` from `docker-compose.yml`.
+
+---
+
+## Session 2 (2026-03-16)
+
+### Context
+Goal was to get the SerpAPI Google Flights scraper actually working end-to-end, add booking links, clean up the comparison engine, and prepare the app for a blog post.
+
+---
+
+### 1. AIInsightsPanel Removed
+
+Removed the `AIInsightsPanel` component from `ComparisonView.tsx` and deleted `AIInsightsPanel.tsx`. The follow-up question input was a placeholder ("coming soon!" alerts) and added no value.
+
+---
+
+### 2. SerpAPI Scraper — Fixed and Working
+
+**Multiple bugs fixed in `packages/server/src/scrapers/google-flights/index.ts`:**
+
+- **Env var mismatch**: `.env` had `SERPAPI_KEY` but code read `SERPAPI_API_KEY`. Renamed in `.env` and added `SERPAPI_API_KEY` to the Zod schema in `packages/server/src/config/env.ts`. Removed `(env as any)` casts.
+- **`travel_class` was string, must be numeric**: SerpAPI expects `1`/`2`/`3`/`4`, not `"economy"`/`"business"`. Created `CABIN_CLASS_MAP` record.
+- **`type` parameter missing**: Wasn't being sent at all (defaulted to round-trip). Now explicitly set to `2` (one-way).
+- **Dates sent as Date objects**: SerpAPI needs `YYYY-MM-DD` strings. Added `formatDate()` helper.
+- **Round-trip only returned outbound flights**: SerpAPI's round-trip mode is a two-step `departure_token` flow. Switched to making **two separate one-way searches** (outbound + return) which gives us all flights for both legs. Extracted `fetchOneWay()` as a standalone function.
+- **NaN price crash**: Some SerpAPI flights have no price (undefined). `price * passengers` = `NaN`, which crashes Prisma `createMany`. Added filter to skip flights with invalid prices.
+- **Added structured logging** instead of `console.log(JSON.stringify(data))`.
+
+---
+
+### 3. Booking URL — Added End-to-End
+
+**New field `bookingUrl` added across the full stack:**
+- `ScrapedFlight` interface in `scraper.interface.ts`
+- `Flight` model in `prisma/schema.prisma` (nullable `String?`)
+- `Flight` interface in `packages/shared/src/types.ts`
+- `search.job.ts` — persists `bookingUrl` to DB
+- Prisma migration `20260316220647_add_booking_url` applied
+
+**Google Flights URL construction**: SerpAPI doesn't return direct booking URLs. Built `buildGoogleFlightsUrl()` that constructs `https://www.google.com/travel/flights?q=Flights+from+{origin}+to+{dest}+on+{date}`.
+
+**`booking_token` stored in `rawData`** for future use — can make a follow-up SerpAPI call to get actual airline booking options.
+
+**FlightCard updated**: Shows "View on Google Flights →" link that opens in new tab when `bookingUrl` exists. Click is `stopPropagation`'d so it doesn't trigger the card's `onSelect`.
+
+---
+
+### 4. Mock Scraper Auto-Disabled
+
+Changed `ScraperFactory.getAvailableScrapers()` to prefer real scrapers over mock. If any real scraper (source !== 'mock') is available, mock is excluded. Falls back to mock only if no real scrapers are configured.
+
+---
+
+### 5. Search Status Tracking
+
+**Problem**: Frontend polled for results every 2 seconds, up to 30 attempts. If the search returned 0 flights (SerpAPI had no results), it polled forever — 60 seconds of wasted DB queries.
+
+**New `status` field on SearchQuery**: `PENDING` → `COMPLETED` | `FAILED`
+- Added `SearchStatus` enum to Prisma schema
+- Added `status` field to `SearchQuery` model (default `PENDING`)
+- Added `SearchStatus` type to shared types
+- Migration `20260316221127_add_search_status` applied
+- `search.job.ts` now wraps in try/catch: sets `COMPLETED` on success, `FAILED` on error
+- Frontend `useSearch.ts`: polling stops when `status` is `COMPLETED` or `FAILED`
+- `SearchResultsPage.tsx`: shows "No flights found" message instead of infinite spinner when search completes with 0 results
+
+---
+
+### 6. Comparison Engine — Same Airline vs Best Mix
+
+**Problem**: The old comparison compared "round trip" vs "one-way" but both sides showed identical flights. The 10% "round trip discount" was fabricated.
+
+**New logic in `comparison.job.ts`:**
+- **Same Airline**: Finds the cheapest outbound+return combo where both legs are the same carrier. Iterates all outbound flights, finds matching-airline return flights, picks cheapest combo.
+- **Best Mix**: Cheapest outbound + cheapest return regardless of airline.
+- Fake 10% discount removed — all prices are real SerpAPI prices.
+
+**Labels updated across all components:**
+- `ComparisonView.tsx`: "Round Trip vs. One-Way" → "Same Airline vs. Best Mix"
+- `PriceComparisonChart.tsx`: bar labels updated
+- `ComparisonTable.tsx`: column headers updated
+- `SavingsBadge.tsx`: "Round-trip saves" → "Same Airline saves", "One-way saves" → "Mix & Match saves"
+
+---
+
+### 7. Server Resilience
+
+- `packages/server/src/index.ts`: Worker startup failure no longer crashes the server. Wrapped in try/catch — logs warning and continues (searches fall back to direct processing).
+- Recurring port 3001 `EADDRINUSE` issue — user frequently has stale server processes. Need to kill with `lsof -ti:3001 | xargs kill -9` before restarting.
+
+---
+
+### Outstanding Issues (as of end of session 2)
+1. **Filters still broken** — Layover filter only handles "Direct" (boolean `isLayover`), not layover count. Price slider resets on re-render. No sort functionality.
+2. **`layoverAirport` always null** — Scraper layover parsing from SerpAPI segments needs fixing (layover data exists in the response but isn't being extracted correctly).
+3. **Airport input has no autocomplete/validation** — User can type anything.
+4. **Prisma query logging extremely verbose** — Should be turned off for dev comfort.
+5. **Pre-existing TS errors in `mock.scraper.ts`** — `cabinClass` type mismatch. Non-blocking since mock is disabled.
+6. **Blog post** — User wants to write about using Claude Code to build this. Needs clean screenshots of each stage.
+7. **RAG pipeline** — Next major feature. Historical flight pricing data for LLM-powered booking recommendations.
+8. **Direct airline booking links** — `booking_token` is stored but the follow-up SerpAPI call to get airline URLs is not yet implemented.

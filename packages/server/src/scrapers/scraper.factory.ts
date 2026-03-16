@@ -21,7 +21,10 @@ export class ScraperFactory {
   }
 
   static getAvailableScrapers(): IScraper[] {
-    return Array.from(ScraperFactory.scrapers.values()).filter((s) => s.isAvailable());
+    const available = Array.from(ScraperFactory.scrapers.values()).filter((s) => s.isAvailable());
+    // If real scrapers are available, skip mock data
+    const realScrapers = available.filter((s) => s.source !== 'mock');
+    return realScrapers.length > 0 ? realScrapers : available;
   }
 
   static registerScraper(scraper: IScraper): void {

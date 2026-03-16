@@ -15,7 +15,8 @@ export function SearchResultsPage() {
   const filterStore = useFilterStore();
 
   const allFlights: Flight[] = flightsData?.flights ?? searchData?.flights ?? [];
-  const isStillSearching = searchLoading || flightsLoading || (allFlights.length === 0 && (searchFetching || flightsFetching));
+  const searchDone = searchData?.status === 'COMPLETED' || searchData?.status === 'FAILED';
+  const isStillSearching = searchLoading || flightsLoading || (!searchDone && (searchFetching || flightsFetching));
 
   const filteredFlights = allFlights.filter((f) => {
     if (filterStore.maxPrice !== undefined && Number(f.price) > filterStore.maxPrice) return false;
@@ -42,6 +43,11 @@ export function SearchResultsPage() {
       {isStillSearching ? (
         <div className="flex justify-center py-24">
           <LoadingSpinner size="lg" label="Searching for flights..." />
+        </div>
+      ) : searchDone && allFlights.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 text-gray-500">
+          <div className="text-4xl mb-4">No flights found</div>
+          <p className="text-lg">Try adjusting your search — different dates, airports, or fewer filters.</p>
         </div>
       ) : (
         <div className="flex gap-6">

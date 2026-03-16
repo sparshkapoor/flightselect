@@ -10,6 +10,13 @@ interface FlightCardProps {
 }
 
 export function FlightCard({ flight, selected, onSelect }: FlightCardProps) {
+  const handleBookingClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (flight.bookingUrl) {
+      window.open(flight.bookingUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
+
   return (
     <div
       className={`card flex items-center gap-4 cursor-pointer transition-all ${
@@ -35,6 +42,14 @@ export function FlightCard({ flight, selected, onSelect }: FlightCardProps) {
       <div className="text-right">
         <PriceTag amount={Number(flight.price)} currency={flight.currency} />
         <div className="text-xs text-gray-400 mt-0.5">per person</div>
+        {flight.bookingUrl && (
+          <button
+            onClick={handleBookingClick}
+            className="mt-1 text-xs text-brand-600 hover:text-brand-800 font-medium hover:underline"
+          >
+            View on Google Flights &rarr;
+          </button>
+        )}
       </div>
     </div>
   );

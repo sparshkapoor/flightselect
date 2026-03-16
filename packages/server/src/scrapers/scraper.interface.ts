@@ -27,6 +27,7 @@ export interface ScrapedFlight {
   layoverDurationMinutes: number | null;
   source: string;
   scrapedAt: Date;
+  bookingUrl: string | null;
   rawData?: Record<string, unknown>;
 }
 

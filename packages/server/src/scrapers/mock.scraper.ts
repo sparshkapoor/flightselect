@@ -93,6 +93,7 @@ function generateFlights(
       layoverDurationMinutes,
       source: 'mock',
       scrapedAt,
+      bookingUrl: null,
       rawData: {
         mock: true,
         layoverCount,

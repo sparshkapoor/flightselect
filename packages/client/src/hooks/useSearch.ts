@@ -38,6 +38,10 @@ export function useSearchSubmit() {
 
 const MAX_POLL_ATTEMPTS = 30;
 
+function isSearchDone(data: any): boolean {
+  return data?.status === 'COMPLETED' || data?.status === 'FAILED';
+}
+
 export function useSearchResults(searchQueryId: string | null) {
   return useQuery({
     queryKey: ['search', searchQueryId],
@@ -45,7 +49,7 @@ export function useSearchResults(searchQueryId: string | null) {
     enabled: !!searchQueryId,
     refetchInterval: (query) => {
       const data = query.state.data;
-      if (data?.flights?.length > 0) return false;
+      if (isSearchDone(data)) return false;
       if ((query.state.dataUpdateCount ?? 0) >= MAX_POLL_ATTEMPTS) return false;
       return 2000;
     },
@@ -53,11 +57,15 @@ export function useSearchResults(searchQueryId: string | null) {
 }
 
 export function useFlights(searchQueryId: string | null) {
+  const searchResults = useSearchResults(searchQueryId);
+  const done = isSearchDone(searchResults.data);
+
   return useQuery({
     queryKey: ['flights', searchQueryId],
     queryFn: () => getFlights(searchQueryId ?? undefined),
     enabled: !!searchQueryId,
     refetchInterval: (query) => {
+      if (done) return false;
       const data = query.state.data;
       if (data?.flights?.length > 0) return false;
       if ((query.state.dataUpdateCount ?? 0) >= MAX_POLL_ATTEMPTS) return false;
@@ -67,11 +75,15 @@ export function useFlights(searchQueryId: string | null) {
 }
 
 export function useComparisons(searchQueryId: string | null) {
+  const searchResults = useSearchResults(searchQueryId);
+  const done = isSearchDone(searchResults.data);
+
   return useQuery({
     queryKey: ['comparisons', searchQueryId],
     queryFn: () => getComparisonsByQuery(searchQueryId!),
     enabled: !!searchQueryId,
     refetchInterval: (query) => {
+      if (done) return false;
       const data = query.state.data;
       if (data && data.length > 0) return false;
       if ((query.state.dataUpdateCount ?? 0) >= MAX_POLL_ATTEMPTS) return false;
