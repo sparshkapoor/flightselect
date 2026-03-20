@@ -1,4 +1,5 @@
 import { IScraper, ScraperSearchParams, ScrapedFlight } from './scraper.interface';
+import { CabinClass } from '@flightselect/shared';
 import { generatePrice } from '../utils/pricing';
 import { getLayoverOptions } from '../utils/airports';
 
@@ -45,7 +46,7 @@ function generateFlights(
   origin: string,
   destination: string,
   date: Date,
-  cabinClass: string,
+  cabinClass: CabinClass,
   count: number,
 ): ScrapedFlight[] {
   const international = isInternational(origin, destination);

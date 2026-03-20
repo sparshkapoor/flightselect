@@ -200,3 +200,132 @@ Changed `ScraperFactory.getAvailableScrapers()` to prefer real scrapers over moc
 6. **Blog post** — User wants to write about using Claude Code to build this. Needs clean screenshots of each stage.
 7. **RAG pipeline** — Next major feature. Historical flight pricing data for LLM-powered booking recommendations.
 8. **Direct airline booking links** — `booking_token` is stored but the follow-up SerpAPI call to get airline URLs is not yet implemented.
+
+---
+
+## Session 3 (2026-03-19)
+
+### Context
+Goal was to add SerpAPI rate limiting (protect the 250/month quota), fix blog-post-blocking issues (TS errors, verbose logging), and surface API errors to the frontend.
+
+---
+
+### 1. SerpAPI Rate Limiter — Two-Layer Redis-Based
+
+**New file: `packages/server/src/middleware/serpApiRateLimit.middleware.ts`**
+
+Two layers of protection:
+
+- **Per-client sliding window**: 1 search per 60 seconds per IP address. Uses Redis `SET key EX 60`. If the key exists, the request is blocked with a 429 including `retryAfterSeconds`.
+- **Global monthly cap**: 225 searches per billing cycle (SerpAPI renews on the 28th). Uses a Redis counter with TTL set to expire at the next renewal date. When the counter hits 225, all further searches are blocked with a 429 including `limitType: 'global_monthly'`.
+
+**Key design decisions:**
+- Billing cycle key is computed dynamically from the current date and renewal day (28th), so it auto-rotates each month.
+- Fail-open: if Redis is down, requests are allowed through (with a logged error). This prevents Redis outages from breaking the app entirely.
+- Rate limit headers (`X-RateLimit-Remaining`, `X-RateLimit-Limit`, `X-RateLimit-Client-RetryAfter`) are set on successful responses for frontend transparency.
+
+**Status endpoint**: `GET /api/search/rate-limit` returns `{ used, remaining, monthlyLimit, renewalDay }` — no rate limiting on this GET.
+
+**Middleware chain on `POST /api/search`**: `searchRateLimit` (express-rate-limit, 10/min) → `serpApiRateLimit` (per-client + global) → `validateBody` → controller.
+
+---
+
+### 2. Frontend 429 Error Handling
+
+**`SearchForm.tsx`**: Added error display. The `useSearchSubmit` hook already caught errors and stored them in `store.searchError`, but the form never rendered them. Now shows a red banner above the submit button with the server's error message (e.g., "Rate limited: please wait 58 seconds before searching again.").
+
+Also removed emoji from the search button text.
+
+---
+
+### 3. Rate Limit Test Script
+
+**New file: `scripts/test-rate-limit.ts`**
+
+Run with `npx ts-node scripts/test-rate-limit.ts` (add `--test-global` to include global cap test).
+
+Tests:
+1. First request succeeds (202)
+2. Same client blocked within 60s window (429 per_client)
+3. Rate limit status endpoint works
+4. Spam protection — 5 concurrent requests, at most 1 succeeds
+5. Response headers include rate limit info
+6. (Optional) Global cap simulation — sets Redis counter to 225, verifies 429, restores original value
+
+---
+
+### 4. Mock Scraper TS Fix
+
+**`packages/server/src/scrapers/mock.scraper.ts`**: Changed `cabinClass: string` to `cabinClass: CabinClass` in `generateFlights()` and added the `CabinClass` import from `@flightselect/shared`. This fixes the type mismatch with `ScrapedFlight.cabinClass` and `generatePrice()`.
+
+---
+
+### 5. Prisma Query Logging Silenced
+
+**`packages/server/src/config/database.ts`**: Changed `log: ['query', 'error', 'warn']` to `log: ['error', 'warn']`. Removes the wall of SQL from dev console while keeping error/warn visibility.
+
+---
+
+### 6. Client TS Error Fix
+
+**`packages/client/src/hooks/useSearch.ts`**: Fixed `data?.flights?.length > 0` to `(data?.flights?.length ?? 0) > 0`. The optional chain could produce `undefined > 0` which TS flagged as possibly undefined.
+
+---
+
+### Outstanding Issues (as of end of session 3)
+1. ~~**Filters still broken**~~ — Fixed in session 3 continued.
+2. ~~**`layoverAirport` always null**~~ — Fixed in session 3 continued.
+3. ~~**Airport input has no autocomplete/validation**~~ — Fixed in session 3 continued.
+4. **Blog post** — Website is cleaner now (no TS errors, no SQL wall, rate limiting in place). Ready for screenshots.
+5. **RAG pipeline** — Next major feature. Historical flight pricing data for LLM-powered booking recommendations.
+6. **Direct airline booking links** — `booking_token` is stored but the follow-up SerpAPI call to get airline URLs is not yet implemented.
+
+---
+
+### 7. Airport Autocomplete — Rewritten
+
+**`packages/client/src/components/search/AirportInput.tsx`** — full rewrite:
+- Removed auto-fill behavior (typing "LOS" no longer auto-selects Lagos). Users must explicitly click a dropdown item.
+- Dropdown opens on focus (click into box) showing top 15 airports, so users can scroll and browse.
+- Typing filters the list with relevance-ranked search (exact code > code starts-with > city starts-with > city word match > contains).
+- Backspace no longer re-triggers auto-fill — clearing text just clears the selection.
+- Error message ("Select an airport from the list") only shows after blur, not while typing.
+
+**`packages/client/src/utils/airportData.ts`** — expanded to ~100 airports. `searchAirports()` now returns results scored by match quality instead of simple `includes()` filter.
+
+**`packages/client/src/pages/SettingsPage.tsx`** — replaced plain text input for Home Airport with the same `AirportInput` component.
+
+---
+
+### 8. Filters Fixed + Sort Added
+
+**`packages/client/src/pages/SearchResultsPage.tsx`**:
+- Layover filter now uses count-based logic (`f.isLayover ? 1 : 0`) instead of broken boolean check.
+- Added sort dropdown: Price (low/high), Duration (shortest), Departure (earliest). Uses `useMemo` for performance.
+- Shows "X of Y flights" count above results.
+
+**`packages/client/src/components/filters/FilterSidebar.tsx`**:
+- Price slider: clears to `undefined` when at max so it doesn't fight with changing flight data.
+- Price bounds computed via `useMemo` to prevent unnecessary recalculations.
+- Layover buttons relabeled: "Direct", "1+", "2+".
+
+---
+
+### 9. LayoverAirport Parsing Fixed
+
+**`packages/server/src/scrapers/google-flights/index.ts`**: Added fallback for when SerpAPI doesn't populate the `layovers` array — extracts layover airport from first segment's arrival airport and estimates duration from the time gap between segments.
+
+---
+
+### 10. UI Cleanup
+
+- Removed "We compare prices across airlines and answer that question with AI-powered insights" subtitle from homepage.
+- Removed trip type toggle (Round Trip / One Way) from SearchForm — comparison is always-on.
+- Removed "Compare Round Trip vs One-Way" checkbox.
+
+---
+
+### Outstanding Issues (as of end of session 3 final)
+1. **Blog post** — Website is ready for screenshots.
+2. **RAG pipeline** — Next major feature.
+3. **Direct airline booking links** — `booking_token` stored, follow-up SerpAPI call not yet implemented.

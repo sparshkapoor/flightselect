@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useDebounce } from '../../hooks/useDebounce';
-import { searchAirports, type Airport } from '../../utils/airportData';
+import { searchAirports, getAirportByCode, AIRPORTS, type Airport } from '../../utils/airportData';
 
 interface AirportInputProps {
   value: string;
@@ -10,21 +9,25 @@ interface AirportInputProps {
 }
 
 export function AirportInput({ value, onChange, placeholder = 'Airport', label }: AirportInputProps) {
-  const [query, setQuery] = useState(value);
+  const [query, setQuery] = useState(() => {
+    if (value) {
+      const airport = getAirportByCode(value);
+      return airport ? `${airport.code} — ${airport.city}` : value;
+    }
+    return '';
+  });
   const [results, setResults] = useState<Airport[]>([]);
   const [open, setOpen] = useState(false);
-  const debouncedQuery = useDebounce(query, 200);
+  const [blurredWithoutSelection, setBlurredWithoutSelection] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Sync display when value prop changes externally (e.g., reset)
   useEffect(() => {
-    if (debouncedQuery.length >= 2) {
-      setResults(searchAirports(debouncedQuery));
-      setOpen(true);
-    } else {
-      setResults([]);
-      setOpen(false);
+    if (!value && query) {
+      setQuery('');
+      setBlurredWithoutSelection(false);
     }
-  }, [debouncedQuery]);
+  }, [value]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -40,7 +43,48 @@ export function AirportInput({ value, onChange, placeholder = 'Airport', label }
     setQuery(`${airport.code} — ${airport.city}`);
     onChange(airport.code);
     setOpen(false);
+    setBlurredWithoutSelection(false);
   }
+
+  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const val = e.target.value;
+    setQuery(val);
+    setBlurredWithoutSelection(false);
+
+    // Clear the selected code — user is editing, they need to pick again
+    if (value) {
+      onChange('');
+    }
+
+    if (val.length >= 1) {
+      setResults(searchAirports(val));
+      setOpen(true);
+    } else {
+      setResults([]);
+      setOpen(true); // show full list on empty
+    }
+  }
+
+  function handleFocus() {
+    setBlurredWithoutSelection(false);
+    if (query.length >= 1) {
+      setResults(searchAirports(query));
+    } else {
+      setResults(AIRPORTS.slice(0, 15));
+    }
+    setOpen(true);
+  }
+
+  function handleBlur() {
+    // Delay to allow click events on dropdown items to fire
+    setTimeout(() => {
+      if (!value && query) {
+        setBlurredWithoutSelection(true);
+      }
+    }, 200);
+  }
+
+  const showError = blurredWithoutSelection && query.length > 0 && !value;
 
   return (
     <div ref={containerRef} className="relative">
@@ -48,16 +92,18 @@ export function AirportInput({ value, onChange, placeholder = 'Airport', label }
       <input
         type="text"
         value={query}
-        onChange={(e) => {
-          setQuery(e.target.value);
-          if (!e.target.value) onChange('');
-        }}
+        onChange={handleInputChange}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
         placeholder={placeholder}
-        className="input-field"
+        className={`input-field ${showError ? 'border-red-400 ring-1 ring-red-400' : ''}`}
       />
-      {open && results.length > 0 && (
+      {showError && (
+        <p className="text-xs text-red-500 mt-1">Select an airport from the list</p>
+      )}
+      {open && (
         <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
-          {results.map((airport) => (
+          {(results.length > 0 ? results : (query.length === 0 ? AIRPORTS.slice(0, 15) : [])).map((airport) => (
             <button
               key={airport.code}
               type="button"
@@ -69,6 +115,11 @@ export function AirportInput({ value, onChange, placeholder = 'Airport', label }
               <span className="text-xs text-gray-400 ml-1">· {airport.name}</span>
             </button>
           ))}
+          {query.length >= 1 && results.length === 0 && (
+            <div className="px-4 py-3 text-sm text-gray-500">
+              No airports found for "{query}"
+            </div>
+          )}
         </div>
       )}
     </div>

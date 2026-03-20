@@ -67,7 +67,7 @@ export function useFlights(searchQueryId: string | null) {
     refetchInterval: (query) => {
       if (done) return false;
       const data = query.state.data;
-      if (data?.flights?.length > 0) return false;
+      if ((data?.flights?.length ?? 0) > 0) return false;
       if ((query.state.dataUpdateCount ?? 0) >= MAX_POLL_ATTEMPTS) return false;
       return 2000;
     },

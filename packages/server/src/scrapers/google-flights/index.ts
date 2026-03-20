@@ -80,12 +80,30 @@ function normalizeFlight(
     ?? result.flights.reduce((sum, f) => sum + f.duration, 0);
   const hasLayover = result.flights.length > 1;
 
-  const layover = hasLayover
-    ? {
-        airport: result.flights[0].layovers?.[0]?.id ?? null,
-        duration: result.flights[0].layovers?.[0]?.duration ?? null,
+  // Layover info: SerpAPI puts it on each segment's `layovers` array,
+  // but it's not always present. Fall back to the arrival airport of the
+  // first segment (which is the connecting airport).
+  let layoverAirport: string | null = null;
+  let layoverDuration: number | null = null;
+
+  if (hasLayover) {
+    // Try the explicit layovers array first
+    const explicitLayover = result.flights[0].layovers?.[0];
+    if (explicitLayover) {
+      layoverAirport = explicitLayover.id ?? null;
+      layoverDuration = explicitLayover.duration ?? null;
+    } else {
+      // Fallback: the arrival airport of the first segment is the layover point
+      layoverAirport = firstSegment.arrival_airport?.id ?? null;
+      // Estimate layover duration: gap between first segment arrival and second segment departure
+      if (result.flights.length >= 2) {
+        const seg1Arrival = new Date(firstSegment.arrival_airport.time);
+        const seg2Departure = new Date(result.flights[1].departure_airport.time);
+        const gap = Math.round((seg2Departure.getTime() - seg1Arrival.getTime()) / 60000);
+        if (gap > 0) layoverDuration = gap;
       }
-    : null;
+    }
+  }
 
   return {
     airline: firstSegment.airline,
@@ -99,8 +117,8 @@ function normalizeFlight(
     currency: 'USD',
     cabinClass,
     isLayover: hasLayover,
-    layoverAirport: layover?.airport ? (layover.airport as IATACode) : null,
-    layoverDurationMinutes: layover?.duration ?? null,
+    layoverAirport: layoverAirport ? (layoverAirport as IATACode) : null,
+    layoverDurationMinutes: layoverDuration,
     source: 'google-flights',
     scrapedAt: new Date(),
     bookingUrl: buildGoogleFlightsUrl(

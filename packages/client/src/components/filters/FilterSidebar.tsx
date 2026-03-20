@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useFilterStore } from '../../stores/filterStore';
 import type { Flight } from '@flightselect/shared';
 
@@ -7,10 +8,16 @@ interface FilterSidebarProps {
 
 export function FilterSidebar({ flights }: FilterSidebarProps) {
   const store = useFilterStore();
-  const airlines = [...new Set(flights.map((f) => f.airline))].sort();
-  const prices = flights.map((f) => Number(f.price));
-  const maxFlightPrice = Math.max(...prices, 0);
-  const minFlightPrice = Math.min(...prices, 0);
+
+  const { airlines, maxFlightPrice, minFlightPrice } = useMemo(() => {
+    const airlines = [...new Set(flights.map((f) => f.airline))].sort();
+    const prices = flights.map((f) => Number(f.price));
+    return {
+      airlines,
+      maxFlightPrice: prices.length ? Math.ceil(Math.max(...prices)) : 1000,
+      minFlightPrice: prices.length ? Math.floor(Math.min(...prices)) : 0,
+    };
+  }, [flights]);
 
   return (
     <div className="card space-y-5 w-64 shrink-0">
@@ -28,7 +35,7 @@ export function FilterSidebar({ flights }: FilterSidebarProps) {
       {/* Price range */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Max Price: {store.maxPrice ? `$${store.maxPrice}` : 'Any'}
+          Max Price: {store.maxPrice !== undefined ? `$${store.maxPrice}` : 'Any'}
         </label>
         <input
           type="range"
@@ -36,7 +43,10 @@ export function FilterSidebar({ flights }: FilterSidebarProps) {
           max={maxFlightPrice}
           step={10}
           value={store.maxPrice ?? maxFlightPrice}
-          onChange={(e) => store.setMaxPrice(Number(e.target.value))}
+          onChange={(e) => {
+            const v = Number(e.target.value);
+            store.setMaxPrice(v >= maxFlightPrice ? undefined : v);
+          }}
           className="w-full accent-brand-600"
         />
         <div className="flex justify-between text-xs text-gray-400 mt-1">
@@ -47,7 +57,7 @@ export function FilterSidebar({ flights }: FilterSidebarProps) {
 
       {/* Layovers */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Max Layovers</label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Stops</label>
         <div className="flex gap-2">
           {[undefined, 0, 1, 2].map((v) => (
             <button
@@ -56,11 +66,11 @@ export function FilterSidebar({ flights }: FilterSidebarProps) {
               className={`px-2.5 py-1 rounded text-xs border transition-colors ${
                 store.maxLayovers === v
                   ? 'bg-brand-600 text-white border-brand-600'
-                  : 'bg-white text-gray-600 border-gray-300'
+                  : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
               }`}
               onClick={() => store.setMaxLayovers(v)}
             >
-              {v === undefined ? 'Any' : v === 0 ? 'Direct' : v}
+              {v === undefined ? 'Any' : v === 0 ? 'Direct' : `${v}+`}
             </button>
           ))}
         </div>
@@ -69,7 +79,7 @@ export function FilterSidebar({ flights }: FilterSidebarProps) {
       {/* Max Duration */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Max Flight Duration: {store.maxDurationMinutes ? `${Math.floor(store.maxDurationMinutes / 60)}h ${store.maxDurationMinutes % 60}m` : 'Any'}
+          Max Duration: {store.maxDurationMinutes ? `${Math.floor(store.maxDurationMinutes / 60)}h ${store.maxDurationMinutes % 60}m` : 'Any'}
         </label>
         <input
           type="range"

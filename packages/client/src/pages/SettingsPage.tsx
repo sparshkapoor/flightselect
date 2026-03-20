@@ -1,4 +1,5 @@
 import { useUserStore } from '../stores/userStore';
+import { AirportInput } from '../components/search/AirportInput';
 
 export function SettingsPage() {
   const store = useUserStore();
@@ -11,15 +12,12 @@ export function SettingsPage() {
     <div className="max-w-2xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Settings</h1>
       <div className="card space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Home Airport</label>
-          <input
-            type="text"
+        <div className="max-w-xs">
+          <AirportInput
+            label="Home Airport"
             value={store.homeAirport ?? ''}
-            onChange={(e) => updateUser({ homeAirport: e.target.value.toUpperCase() })}
+            onChange={(code) => updateUser({ homeAirport: code })}
             placeholder="e.g. SFO"
-            maxLength={3}
-            className="input-field w-32 uppercase"
           />
         </div>
         <div>

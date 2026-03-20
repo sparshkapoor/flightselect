@@ -1,5 +1,4 @@
 import { useNavigate } from 'react-router-dom';
-import { TripType } from '@flightselect/shared';
 import { AirportInput } from './AirportInput';
 import { DatePicker } from './DatePicker';
 import { PassengerSelector } from './PassengerSelector';
@@ -11,7 +10,7 @@ import { LoadingSpinner } from '../common/LoadingSpinner';
 
 export function SearchForm() {
   const store = useSearchStore();
-  const { submitSearch, isSubmitting } = useSearchSubmit();
+  const { submitSearch, isSubmitting, error } = useSearchSubmit();
   const navigate = useNavigate();
 
   async function handleSubmit(e: React.FormEvent) {
@@ -40,39 +39,6 @@ export function SearchForm() {
 
   return (
     <form onSubmit={handleSubmit} className="card space-y-5 shadow-md">
-      {/* Trip type toggle */}
-      <div className="flex items-center justify-between">
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
-          {[TripType.ROUND_TRIP, TripType.ONE_WAY].map((t) => (
-            <button
-              key={t}
-              type="button"
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-                store.tripType === t
-                  ? 'bg-white shadow text-brand-700'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-              onClick={() => store.setTripType(t)}
-            >
-              {t === TripType.ROUND_TRIP ? 'Round Trip' : 'One Way'}
-            </button>
-          ))}
-        </div>
-
-        {/* Compare mode */}
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={store.compareMode}
-            onChange={(e) => store.setCompareMode(e.target.checked)}
-            className="rounded accent-brand-600"
-          />
-          <span className="text-sm font-medium text-brand-700">
-            🔍 Compare Round Trip vs One-Way
-          </span>
-        </label>
-      </div>
-
       {/* Route */}
       <div className="grid grid-cols-2 gap-4">
         <AirportInput
@@ -98,7 +64,7 @@ export function SearchForm() {
           required
         />
         <DatePicker
-          label={store.tripType === TripType.ROUND_TRIP ? 'Return' : 'Return (optional)'}
+          label="Return"
           value={store.returnDate}
           onChange={store.setReturnDate}
           min={store.departureDate}
@@ -125,6 +91,13 @@ export function SearchForm() {
         onAvoidedAirlinesChange={store.setAvoidedAirlines}
       />
 
+      {/* Error display */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
+
       {/* Submit */}
       <button
         type="submit"
@@ -137,7 +110,7 @@ export function SearchForm() {
             Searching...
           </>
         ) : (
-          '🔍 Search Flights'
+          'Search Flights'
         )}
       </button>
     </form>

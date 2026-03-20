@@ -8,11 +8,8 @@ export function HomePage() {
           <h1 className="text-5xl font-bold text-white mb-4">
             ✈️ FlightSelect
           </h1>
-          <p className="text-xl text-blue-100 mb-2">
+          <p className="text-xl text-blue-100">
             Should you book round-trip or two one-way tickets?
-          </p>
-          <p className="text-blue-200 text-sm">
-            We compare prices across airlines and answer that question with AI-powered insights.
           </p>
         </div>
         <SearchForm />
