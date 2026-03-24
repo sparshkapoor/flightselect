@@ -1,10 +1,8 @@
-# FlightSelect ✈️
+# FlightSelect
 
-> Intelligently compare round-trip vs. one-way flight pricing across multiple sources.
+> Compare round-trip vs. one-way flight pricing to find the cheapest booking strategy.
 
-**The core question FlightSelect answers:** *"Should I book a round-trip ticket, or would two separate one-way tickets on potentially different airlines be cheaper or more convenient?"*
-
-FlightSelect aggregates flight data from multiple sources (currently mock; real scrapers coming soon), computes side-by-side comparisons, and provides AI-powered natural-language analysis to help travelers make smarter booking decisions.
+FlightSelect answers a simple question: *should you book a round-trip ticket, or would two separate one-way tickets be cheaper?* It aggregates real flight data via the SerpAPI Google Flights API, computes side-by-side price comparisons, and surfaces the best option.
 
 ---
 
@@ -19,19 +17,19 @@ FlightSelect aggregates flight data from multiple sources (currently mock; real 
 │  │  React   │                 │  Server (port 3001)          │  │
 │  │  Client  │ ◄────────────── │                              │  │
 │  │ (port    │                 │  ┌──────────┐ ┌──────────┐   │  │
-│  │  5173)   │                 │  │ Scrapers │ │  BullMQ  │   │  │
-│  └──────────┘                 │  │  (Mock,  │ │  Jobs    │   │  │
-│                               │  │  Google, │ └────┬─────┘   │  │
-│                               │  │  Skyscnr,│      │         │  │
-│                               │  │  Amadeus)│      ▼         │  │
+│  │  5173)   │                 │  │ SerpAPI  │ │  BullMQ  │   │  │
+│  └──────────┘                 │  │  Google  │ │  Jobs    │   │  │
+│                               │  │  Flights │ └────┬─────┘   │  │
+│                               │  │          │      │         │  │
+│                               │  │          │      ▼         │  │
 │                               │  └──────────┘ ┌──────────┐   │  │
 │                               │               │  Redis   │   │  │
 │                               │  ┌──────────┐ └──────────┘   │  │
 │                               │  │  Prisma  │                │  │
-│                               │  │  (ORM)   │ ┌──────────┐   │  │
-│                               │  └────┬─────┘ │  AI Svc  │   │  │
-│                               │       │       │  (Mock)  │   │  │
-│                               │       ▼       └──────────┘   │  │
+│                               │  │  (ORM)   │                │  │
+│                               │  └────┬─────┘                │  │
+│                               │       │                      │  │
+│                               │       ▼                      │  │
 │                               │  ┌──────────┐                │  │
 │                               │  │PostgreSQL│                │  │
 │                               │  └──────────┘                │  │
@@ -157,85 +155,6 @@ flightselect/
 | GET | `/api/users/:id` | Get a user |
 | PUT | `/api/users/:id` | Update a user |
 | DELETE | `/api/users/:id` | Delete a user |
-
----
-
-## AI Integration (Planned)
-
-**Interface location:** `packages/server/src/services/ai/`
-
-| File | Purpose |
-|---|---|
-| `ai.interface.ts` | `IAIService` — the contract every AI implementation must satisfy |
-| `ai.types.ts` | `AIAnalysisInput` / `AIAnalysisOutput` — typed request/response payloads |
-| `ai.service.ts` | `MockAIService` — current placeholder implementation |
-
-### What the interface expects and returns
-
-**Input (`AIAnalysisInput`):**
-```typescript
-{
-  comparisonId: string;
-  roundTripTotalPrice: number;
-  oneWayTotalPrice: number;
-  priceDifference: number;
-  originAirport: string;
-  destinationAirport: string;
-  departureDate: string;
-  returnDate?: string;
-  cabinClass: string;
-  passengers: number;
-}
-```
-
-**Output (`AIAnalysisOutput`):**
-```typescript
-{
-  summary: string;             // Natural language summary
-  recommendation: RecommendedOption;
-  confidenceScore: number;     // 0–1
-  reasoning: string[];         // Bullet-point reasoning
-  warnings: string[];          // Caveats / considerations
-  generatedAt: string;         // ISO timestamp
-}
-```
-
-### Current implementation
-`MockAIService` returns deterministic, realistic-looking mock analysis without any API calls.
-
-### How to add a real LLM
-1. Create a new class implementing `IAIService` (e.g., `ClaudeAIService`)
-2. Call your LLM with a structured prompt built from `AIAnalysisInput`
-3. Parse the LLM's response into `AIAnalysisOutput`
-4. Set `AI_SERVICE_API_KEY` and `AI_SERVICE_MODEL` in `packages/server/.env`
-5. Replace `MockAIService` with your new class in the relevant service/job files
-
-**Suggested models:**
-- **Anthropic Claude** (claude-3-opus-20240229, claude-3-5-sonnet-20241022) — excellent for structured analysis
-- **OpenAI GPT-4o** — strong structured output with JSON mode
-- **Open-source via Groq/Together.ai** — Mixtral 8x7B or LLaMA 3 for cost-sensitive setups
-
----
-
-## Adding New Scrapers
-
-All scrapers implement `IScraper` from `packages/server/src/scrapers/scraper.interface.ts`:
-
-```typescript
-interface IScraper {
-  readonly source: string;
-  search(params: ScraperSearchParams): Promise<ScrapedFlight[]>;
-  isAvailable(): boolean;
-}
-```
-
-**Steps to add a scraper:**
-1. Create a new file in `packages/server/src/scrapers/<name>/index.ts`
-2. Implement `IScraper`
-3. Register it in `ScraperFactory` in `scraper.factory.ts`
-4. Add any required env vars to `.env.example`
-
-The **Amadeus API** (`packages/server/src/scrapers/amadeus/index.ts`) is the most viable option for real flight data. See the file for setup instructions and API documentation links.
 
 ---
 

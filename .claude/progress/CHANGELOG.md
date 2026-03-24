@@ -329,3 +329,83 @@ Tests:
 1. **Blog post** — Website is ready for screenshots.
 2. **RAG pipeline** — Next major feature.
 3. **Direct airline booking links** — `booking_token` stored, follow-up SerpAPI call not yet implemented.
+
+---
+
+## Session 4 (2026-03-24)
+
+### Context
+Quick session focused on cleanup: removing dead UI, fixing a scraper crash, and preparing handoff notes for the blog post and RAG pipeline work.
+
+---
+
+### 1. AIInsightsPanel Deleted
+
+Deleted `packages/client/src/components/comparison/AIInsightsPanel.tsx` and removed the import/usage from `ComparisonView.tsx`. The component was a non-functional placeholder ("coming soon!" alerts) — removing it cleans up the comparison view for blog screenshots.
+
+---
+
+### 2. NaN Price Filter in Scraper
+
+**Problem**: Some SerpAPI flights return with `undefined` price. `price * passengers` produces `NaN`, which crashes Prisma's `createMany` because `NaN` is not a valid Decimal.
+
+**Fix in `packages/server/src/scrapers/google-flights/index.ts`**: Added a guard in `processResults()` — flights where `!result.price || isNaN(result.price)` are skipped with a warning log.
+
+---
+
+### 3. Port Cleanup (Recurring)
+
+Port 3001 was occupied by a stale server process from a previous session. Killed with `lsof -ti:3001 | xargs kill -9`. Also cleared stale Vite processes on 5173/5174/5175. This continues to be a recurring issue — user needs to Ctrl+C cleanly or kill ports before restarting.
+
+---
+
+### 4. Committed & Pushed
+
+All session 2-4 changes committed as `77bc88c` — "SerpAPI scraper working, booking links, comparison engine overhaul". Pushed to `origin/main`.
+
+---
+
+### Outstanding Issues (as of end of session 4)
+1. **Search button not working** — User reported it's broken again at end of session. Likely stale server or Docker not running. Needs investigation next session.
+2. **Filters still need work** — Layover count filter, price slider reset, sort integration.
+3. **Blog post** — User wants to write about building FlightSelect with Claude Code. Website ready for screenshots. Blog file exists at `blog/post.md`.
+4. **RAG pipeline** — Next major feature: scrape and persist historical flight pricing data, build a RAG database an LLM can query for booking recommendations.
+5. **Direct airline booking links** — `booking_token` stored in rawData, follow-up SerpAPI call not yet implemented.
+6. **Personal website fade-in transition** — User wants a loading animation similar to agiledigital.com.au for their portfolio site (separate project at `~/Personal Website/`).
+
+---
+
+## Session 5 (2026-03-24)
+
+### Context
+Blog post editing, 429 screenshot simulation, README cleanup.
+
+---
+
+### 1. Blog Post Proofreading
+
+Reviewed and fixed ~20+ spelling/grammar issues in `blog/post.md`: Intruiged→Intrigued, infrustructure→infrastructure, debuging→debugging, safegaurds→safeguards, boundries→boundaries, etc. Also fixed grammar: "can't be understated"→"can't be overstated", "never actually connecting"→"never actually connected", tense consistency, and awkward phrasing throughout.
+
+---
+
+### 2. 429 Rate Limit Screenshot
+
+Added a temporary force-429 block in `serpApiRateLimit.middleware.ts` so user could trigger and screenshot the rate limit error on the frontend. Reverted after screenshot was captured.
+
+---
+
+### 3. README Overhaul
+
+- Removed AI Integration (Planned) section with LLM setup instructions and model suggestions
+- Removed Adding New Scrapers section with IScraper interface docs
+- Updated intro: removed "mock; real scrapers coming soon" language, now describes SerpAPI as the live data source
+- Updated architecture diagram: replaced Mock/Google/Skyscanner/Amadeus scraper labels with SerpAPI Google Flights, removed AI Svc (Mock) box
+
+---
+
+### Outstanding Issues (as of end of session 5)
+1. **Filters still need work** — Layover count filter, price slider reset, sort integration.
+2. **Blog post** — Draft complete at `blog/post.md`, needs screenshots inserted at comment placeholders.
+3. **RAG pipeline** — Next major feature: historical flight pricing data + LLM query layer.
+4. **Direct airline booking links** — `booking_token` stored, follow-up SerpAPI call not yet implemented.
+5. **Personal website fade-in transition** — Separate project at `~/Personal Website/`.
