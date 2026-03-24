@@ -18,7 +18,7 @@ FlightSelect answers a simple question: *should you book a round-trip ticket, or
 │  │  Client  │ ◄────────────── │                              │  │
 │  │ (port    │                 │  ┌──────────┐ ┌──────────┐   │  │
 │  │  5173)   │                 │  │ SerpAPI  │ │  BullMQ  │   │  │
-│  └──────────┘                 │  │  Google  │ │  Jobs    │   │  │
+│  └──────────┘                 │  │  Google  │◄│  Jobs    │   │  │
 │                               │  │  Flights │ └────┬─────┘   │  │
 │                               │  │          │      │         │  │
 │                               │  │          │      ▼         │  │
