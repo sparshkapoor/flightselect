@@ -21,7 +21,6 @@ export function AirportInput({ value, onChange, placeholder = 'Airport', label }
   const [blurredWithoutSelection, setBlurredWithoutSelection] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Sync display when value prop changes externally (e.g., reset)
   useEffect(() => {
     if (!value && query) {
       setQuery('');
@@ -50,37 +49,25 @@ export function AirportInput({ value, onChange, placeholder = 'Airport', label }
     const val = e.target.value;
     setQuery(val);
     setBlurredWithoutSelection(false);
-
-    // Clear the selected code — user is editing, they need to pick again
-    if (value) {
-      onChange('');
-    }
-
+    if (value) onChange('');
     if (val.length >= 1) {
       setResults(searchAirports(val));
       setOpen(true);
     } else {
       setResults([]);
-      setOpen(true); // show full list on empty
+      setOpen(true);
     }
   }
 
   function handleFocus() {
     setBlurredWithoutSelection(false);
-    if (query.length >= 1) {
-      setResults(searchAirports(query));
-    } else {
-      setResults(AIRPORTS.slice(0, 15));
-    }
+    setResults(query.length >= 1 ? searchAirports(query) : AIRPORTS.slice(0, 15));
     setOpen(true);
   }
 
   function handleBlur() {
-    // Delay to allow click events on dropdown items to fire
     setTimeout(() => {
-      if (!value && query) {
-        setBlurredWithoutSelection(true);
-      }
+      if (!value && query) setBlurredWithoutSelection(true);
     }, 200);
   }
 
@@ -116,9 +103,7 @@ export function AirportInput({ value, onChange, placeholder = 'Airport', label }
             </button>
           ))}
           {query.length >= 1 && results.length === 0 && (
-            <div className="px-4 py-3 text-sm text-gray-500">
-              No airports found for "{query}"
-            </div>
+            <div className="px-4 py-3 text-sm text-gray-500">No airports found for "{query}"</div>
           )}
         </div>
       )}

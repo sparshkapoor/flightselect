@@ -6,9 +6,11 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\" \"npm run dev:rag\" \"npm run dev:ollama\"",
     "dev:client": "npm run dev --workspace=packages/client",
     "dev:server": "npm run dev --workspace=packages/server",
+    "dev:rag": "uvicorn rag.server:app --host 0.0.0.0 --port 8000",
+    "dev:ollama": "ollama serve || true",
     "build": "npm run build --workspace=packages/shared && npm run build --workspace=packages/server && npm run build --workspace=packages/client",
     "db:migrate": "npm run db:migrate --workspace=packages/server",
     "db:seed": "npm run db:seed --workspace=packages/server",

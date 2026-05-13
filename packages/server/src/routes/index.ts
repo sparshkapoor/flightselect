@@ -4,6 +4,7 @@ import searchRoutes from './search.routes';
 import flightsRoutes from './flights.routes';
 import comparisonRoutes from './comparison.routes';
 import userRoutes from './user.routes';
+import ragRoutes from './rag.routes';
 
 const router = Router();
 
@@ -12,5 +13,6 @@ router.use('/search', searchRoutes);
 router.use('/flights', flightsRoutes);
 router.use('/comparison', comparisonRoutes);
 router.use('/users', userRoutes);
+router.use('/rag', ragRoutes);
 
 export default router;

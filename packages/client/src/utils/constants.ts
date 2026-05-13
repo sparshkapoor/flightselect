@@ -7,7 +7,3 @@ export const CABIN_CLASS_LABELS: Record<string, string> = {
   FIRST: 'First Class',
 };
 
-export const TRIP_TYPE_LABELS: Record<string, string> = {
-  ONE_WAY: 'One Way',
-  ROUND_TRIP: 'Round Trip',
-};

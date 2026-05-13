@@ -27,8 +27,4 @@ export class ScraperFactory {
     return realScrapers.length > 0 ? realScrapers : available;
   }
 
-  static registerScraper(scraper: IScraper): void {
-    ScraperFactory.scrapers.set(scraper.source, scraper);
-  }
-  
 }

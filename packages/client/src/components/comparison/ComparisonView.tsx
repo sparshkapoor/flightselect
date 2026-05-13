@@ -5,6 +5,7 @@ import { FlightCard } from '../results/FlightCard';
 import { SavingsBadge } from './SavingsBadge';
 import { PriceComparisonChart } from './PriceComparisonChart';
 import { ComparisonTable } from './ComparisonTable';
+import { AIInsightCard } from './AIInsightCard';
 
 
 interface ComparisonViewProps {
@@ -26,6 +27,11 @@ export function ComparisonView({
   oneWayOutboundFlights,
   oneWayReturnFlights,
 }: ComparisonViewProps) {
+  const origin =
+    oneWayOutboundFlights[0]?.departureAirport ?? roundTripFlights[0]?.departureAirport ?? '';
+  const destination =
+    oneWayOutboundFlights[0]?.arrivalAirport ?? roundTripFlights[0]?.arrivalAirport ?? '';
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -35,6 +41,15 @@ export function ComparisonView({
           {RECOMMENDATION_LABELS[comparison.recommendedOption]}
         </span>
       </div>
+
+      {/* AI insight — compact, non-blocking, hides itself if RAG has no data */}
+      {origin && destination && (
+        <AIInsightCard
+          comparison={comparison}
+          origin={origin}
+          destination={destination}
+        />
+      )}
 
       {/* Price overview cards */}
       <div className="grid grid-cols-3 gap-4">

@@ -1,4 +1,4 @@
-import { Queue, Worker, QueueEvents } from 'bullmq';
+import { Queue, Worker } from 'bullmq';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
 
@@ -31,10 +31,6 @@ export const comparisonQueue = new Queue('flight-comparison', {
     removeOnComplete: 100,
     removeOnFail: 50,
   },
-});
-
-export const searchQueueEvents = new QueueEvents('flight-search', {
-  connection: redisConnection,
 });
 
 export async function createSearchWorker(

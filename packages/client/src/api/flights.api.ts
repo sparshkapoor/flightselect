@@ -7,7 +7,3 @@ export async function getFlights(searchQueryId?: string): Promise<{ flights: Fli
   return { flights: response.data.data, total: response.data.total };
 }
 
-export async function getFlightById(id: string): Promise<Flight> {
-  const response = await apiClient.get(`/flights/${id}`);
-  return response.data.data;
-}

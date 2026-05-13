@@ -17,14 +17,6 @@ export function formatDurationMinutes(minutes: number): string {
   return `${hours}h ${mins}m`;
 }
 
-export function formatDateTime(dateStr: string): string {
-  return format(new Date(dateStr), 'MMM d, h:mm a');
-}
-
-export function formatDate(dateStr: string): string {
-  return format(new Date(dateStr), 'MMM d, yyyy');
-}
-
 export function formatTime(dateStr: string): string {
   return format(new Date(dateStr), 'h:mm a');
 }

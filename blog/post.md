@@ -1,15 +1,38 @@
 # Building a Flight Price Comparison Tool with Claude Code
 
-*Sparsh Kapoor — March 23, 2026*
+*Sparsh Kapoor — March 26, 2026*
 
 ---
 
 ## Table of Contents
 1. [The Idea](#the-idea)
 2. [Repo Building](#repo-building)
-3. [Usage Limits](#usage-limits)
-4. [Is Everything Correct?](#is-everything-correct)
+3. [Is Everything Correct?](#is-everything-correct)
+4. [Usage Limits](#usage-limits)
 5. [What's Next](#whats-next)
+
+---
+
+## TL;DR — Common Problems & Fixes
+
+Here's a quick rundown of the problems and solutions I experienced before the actual blog post:
+
+**Docker won't start** — you probably have a native Postgres already running on port 5432.
+Fix: change the port mapping in `docker-compose.yml` to `5433:5432` and update `DATABASE_URL` in `.env`.
+
+**Server crashes on startup** — `.env` isn't loading. Make sure `import 'dotenv/config'` is the very first line in `src/index.ts`, before any other imports.
+
+**Search submits but no flights ever appear** — the BullMQ worker wasn't being started.
+Fix: call `createSearchWorker()` in your server bootstrap. Jobs queue silently and sit there forever if nothing's consuming them.
+
+**SerpAPI returns nothing / wrong results** — `travel_class` must be numeric (1/2/3/4), and dates must be `YYYY-MM-DD` strings.
+
+**Comparison shows the same flights on both sides** — SerpAPI's round-trip mode is a two-step token flow. Switch to two separate one-way calls (outbound + return) so both legs are independent.
+
+**Filters do nothing** — the store had all the state but the results page wasn't applying it. Double-check that your filter logic actually runs against the displayed list, not just updates state.
+
+**Port 3001 already in use on restart** — a stale process from the last session.
+Fix: `lsof -ti:3001 | xargs kill -9` before running `npm run dev`.
 
 ---
 
@@ -55,48 +78,50 @@ Copilot set up Zod validation for environment variables but never installed `dot
 
 <!-- Screenshot: claude page with the docker thing -->
 
+Another weird bug was when I was submitting a search. It would appear in the database and the job would get queued, but no flights would show up. I decided to copy the job queries and take a screenshot of the webpage not showing any flights. One thing that was interesting was that the page kept refreshing and resubmitting jobs, as if some API hit was failing and it was trying to rehit the API. While I had that thought within seconds of seeing the page refresh, I didn't mention anything other than the page was simply refreshing over and over again with no flights populating the page.
 
-Another weird bug was when I was submitting a search. It would appear in the database and the job would get queued, but no flights would show up. I decided to copy the job queries and take a screenshot of the webpage not showing any flights. One thing that was interesting was that the page kept refreshing and resubmitting jobs, as if some api hit was failing and it was trying to rehit the api. While I had that thought within seconds of seeing the page refresh, I didn't mention anything other than the page was simply refreshing over and over again with no flights populating the page. 
 I must have prompted Claude three or four times with different error descriptions before it finally found it: a worker function that was never called anywhere even though it was written. Jobs went into the queue and just sat there with nothing consuming them.
 
 Realizing that Claude's code can look complete and still be fundamentally broken was an important lesson I learned in college. Copilot wrote the worker, wrote the queue, wrote the job processor — but never actually connected them. Nowadays I'm hearing a lot of stories about developers using GenAI code in production, with it being incomplete/broken while looking completely viable, and it completely backfiring. The importance of GenAI code review can't be overstated.
 
-### Session 1 
-
-By the end of this first session with Claude Code, the app ran end-to-end on mock data. You could search, see flights, filter results, and view the comparison analysis. It felt like a real product. The only problem is that it was all fake, and I realized that I never gave Claude a specific instruction to find an API that would use real flight data to generate queries. It's important to be as specific as possible when you give prompts, as it improves Claude's understanding performance massively.
-
----
-
-## Usage Limits
-
-This is where I had to start thinking like a real developer. I found a free Google Flights API from SerpAPI, which gives 250 searches per month. That sounds like a lot until you realize you need to make **two** API calls (one for outbound flights, one for return), so it's really 125 searches. And since I was planning to put this on the internet for this blog post, anyone who found the site could burn through my entire monthly quota.
-
-I didn't even think of this until I asked Claude to get rid of the mock scraper and connect the SerpAPI endpoint. Claude wouldn't put safeguards on API endpoints unless I specifically asked it to, and there could have been a real possibility of me getting an insane bill by some troll hitting the search button a billion times.
-After some rudimentary research, I found and told Claude about a couple of rate limiting methods that were common practice. I felt like a real developer for nearly the first time in the whole project, and despite me not writing any of the actual code, it made me feel like I knew the resources and tools needed to get exactly what I wanted so I can focus on what Claude is best for - following instructions and writing code based on those instructions.
-
-One advantage of telling Claude about rate limiting ideas and giving it more freedom on the best policy to implement allowed it to design something I wouldn't have thought of: a fail-open policy. If Redis goes down, the rate limiter lets requests through instead of blocking everything. This seemed like a more professional approach, sacrificing some API requests instead of showing users errors, which are practices I would only get through experience. 
-
-<!-- Screenshot: 429 error displayed on the search form -->
+By the end of this first session with Claude Code, the app ran end-to-end on mock data. You could search, see flights, filter results, and view the comparison analysis. It felt like a real product. The only problem is that it was all fake, and I realized that I never gave Claude a specific instruction to find an API that would use real flight data. Once the basics worked, I swapped the mock scraper for a real SerpAPI endpoint — which opened a whole new set of problems.
 
 ---
 
 ## Is Everything Correct?
 
-After building the rate limiter, I realized I had no way to know if it actually worked without testing it. I was glad I didn't ask Claude to hook up the endpoint and start testing the search queries on the first prompt, as I would have burned through a lot of credits by now. It was becoming evident that Claude changed your code so fast that code review is not only necessary, but a skill you need to learn.
+It was becoming evident that Claude changed your code so fast that code review is not only necessary, but a skill you need to learn. I went through the codebase looking for any code flaws — basic errors, queries leaking to the frontend, broken features from not parsing the SerpAPI responses properly.
 
-Beyond rate limiting, I went through the codebase looking for any code flaws (like basic errors, queries leaking to the frontend). There was a surprising amount of TypeScript errors (this was my first time working with the language, so it was great for learning the language), broken features from not parsing the SerpAPI responses properly, and other things. Each of these was a 5-minute fix for Claude, but finding them all took a full session. Essentially, AI can write code fast, but you still need to use the product yourself to find what's actually broken and debug yourself.
+Almost every parameter being sent to SerpAPI was wrong — cabin class was being sent as a string when it needed to be a number, and dates were being serialized as full timestamps instead of `YYYY-MM-DD`. The most interesting one was that SerpAPI's round-trip mode is actually a two-step token exchange, so the scraper was only returning outbound flights with zero return flights, making the whole comparison engine useless. We ended up switching to two separate one-way calls instead.
+
+The original comparison engine had a fabricated 10% round-trip discount baked in, which made no sense — both sides of the comparison were showing the exact same flights with just a different multiplier on the price. We scrapped it and reframed the whole thing: the real comparison worth making is same-airline both legs versus the cheapest mix-and-match across carriers, which is actually how people book flights.
+
+The filter sidebar looked functional but almost none of it actually worked — filters were defined in state but never applied to the results list, and the layover filter was comparing a stop count against a boolean. There was also a surprising amount of TypeScript errors, which was actually great for learning the language. Each of these was a 5-minute fix for Claude, but finding them all took a full session. Essentially, AI can write code fast, but you still need to use the product yourself to find what's actually broken.
+
+<!-- Screenshot: comparison view showing Same Airline vs Best Mix with real prices -->
+
+---
+
+## Usage Limits
+
+This is where I had to start thinking like a real developer. The SerpAPI free tier gives 250 searches per month. That sounds like a lot until you realize you need to make **two** API calls per search (one for outbound flights, one for return), so it's really 125 searches. And since I was planning to put this on the internet for this blog post, anyone who found the site could burn through my entire monthly quota.
+
+I didn't even think of this until I asked Claude to connect the SerpAPI endpoint. Claude wouldn't put safeguards on API endpoints unless I specifically asked it to, and there could have been a real possibility of me getting an insane bill by some troll hitting the search button a billion times. After some rudimentary research, I found and told Claude about a couple of rate limiting methods that were common practice. I felt like a real developer for nearly the first time in the whole project, and despite me not writing any of the actual code, it made me feel like I knew the resources and tools needed to get exactly what I wanted — so I can focus on what Claude is best for: following instructions and writing code based on those instructions.
+
+One advantage of telling Claude about rate limiting ideas and giving it more freedom on the best policy to implement allowed it to design something I wouldn't have thought of: a fail-open policy. If Redis goes down, the rate limiter lets requests through instead of blocking everything. This seemed like a more professional approach, sacrificing some API requests instead of showing users errors, which are practices I would only get through experience.
+
+<!-- Screenshot: 429 error displayed on the search form -->
 
 ---
 
 ## What's Next
 
-<!-- Screenshot: comparison view showing Same Airline vs Best Mix with real prices -->
-
 While I had a basic engine to compare flight prices, none of it required any form of LLM/AI involvement to help the user find the best price possible. I wanted this to be a project to leverage an LLM to teach myself about different use cases, and explore its limits and boundaries. I asked Claude what the best ways to implement an LLM to maximize efficiency, but minimize cost in training time, if that was even necessary. It said:
-the app already computes round-trip vs one-way price differences, but an LLM could factor in soft things like luggage policy differences, change fee risks, and whether the routing makes sense for the dates.
 
-That was exactly what I was looking for; it eliminated the need of having to train/fine-tune an LLM by myself, which isn't necessary for most cases of LLM implementation, and was a cheap, easy, and fantastic way to use an LLM effectively. 
+> The app already computes round-trip vs one-way price differences, but an LLM could factor in soft things like luggage policy differences, change fee risks, and whether the routing makes sense for the dates.
 
-Building this project is teaching me more about the importance of code verification and the proper use case of LLM implementation. Copilot and Claude Code can produce thousands of lines of working-looking code in minutes, but "working-looking" and "working" are very different things. I plan to implement the LLM by webscraping a ton of old flight data and using that as a database RAG, and I'm excited to continue to use Claude Code as much as possible to further develop my projects.
+That was exactly what I was looking for — it eliminated the need of having to train/fine-tune an LLM by myself, which isn't necessary for most cases of LLM implementation, and was a cheap, easy, and fantastic way to use an LLM effectively.
+
+Building this project is teaching me more about the importance of code verification and the proper use case of LLM implementation. Copilot and Claude Code can produce thousands of lines of working-looking code in minutes, but "working-looking" and "working" are very different things. I plan to implement the LLM by webscraping a ton of old flight data and using that as a RAG database, which is actively in progress, and I'm excited to continue to use Claude Code as much as possible to further develop my projects.
 
 The repo is at [github.com/sparshkapoor/flightselect](https://github.com/sparshkapoor/flightselect).

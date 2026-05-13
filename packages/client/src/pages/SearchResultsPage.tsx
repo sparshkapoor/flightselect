@@ -20,7 +20,13 @@ export function SearchResultsPage() {
 
   const allFlights: Flight[] = flightsData?.flights ?? searchData?.flights ?? [];
   const searchDone = searchData?.status === 'COMPLETED' || searchData?.status === 'FAILED';
-  const isStillSearching = searchLoading || flightsLoading || (!searchDone && (searchFetching || flightsFetching));
+  // Show spinner while loading OR while status is still PENDING (avoids "No flights found" flash
+  // that appeared between the initial response and the first poll completing).
+  const isStillSearching =
+    searchLoading ||
+    flightsLoading ||
+    searchData?.status === 'PENDING' ||
+    (!searchDone && (searchFetching || flightsFetching));
 
   const filteredAndSortedFlights = useMemo(() => {
     const filtered = allFlights.filter((f) => {
@@ -70,7 +76,7 @@ export function SearchResultsPage() {
         <div className="flex justify-center py-24">
           <LoadingSpinner size="lg" label="Searching for flights..." />
         </div>
-      ) : searchDone && allFlights.length === 0 ? (
+      ) : searchDone && allFlights.length === 0 && !flightsLoading && !flightsFetching ? (
         <div className="flex flex-col items-center justify-center py-24 text-gray-500">
           <div className="text-4xl mb-4">No flights found</div>
           <p className="text-lg">Try adjusting your search — different dates, airports, or fewer filters.</p>

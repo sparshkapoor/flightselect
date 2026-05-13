@@ -49,3 +49,14 @@ coverage/
 .cache/
 .parcel-cache/
 .claude/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# ChromaDB / scraped data
+data/
+
+# Generated artifacts
+repomix-output.xml
