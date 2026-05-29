@@ -141,3 +141,11 @@ export interface AIAnalysisResponse {
   warnings: string[];
   generatedAt: string;
 }
+
+export interface BookingOption {
+  seller: string;
+  price: number;
+  currency: string;
+  url: string;
+  baggage?: string;
+}

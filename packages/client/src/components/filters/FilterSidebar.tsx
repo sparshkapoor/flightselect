@@ -42,7 +42,7 @@ export function FilterSidebar({ flights }: FilterSidebarProps) {
           min={minFlightPrice}
           max={maxFlightPrice}
           step={10}
-          value={store.maxPrice ?? maxFlightPrice}
+          value={store.maxPrice !== undefined ? Math.min(store.maxPrice, maxFlightPrice) : maxFlightPrice}
           onChange={(e) => {
             const v = Number(e.target.value);
             store.setMaxPrice(v >= maxFlightPrice ? undefined : v);

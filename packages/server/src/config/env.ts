@@ -10,6 +10,8 @@ const envSchema = z.object({
   AMADEUS_API_KEY: z.string().optional(),
   AMADEUS_API_SECRET: z.string().optional(),
   SERPAPI_API_KEY: z.string().optional(),
+  CORS_ORIGIN: z.string().default('http://localhost:5173'),
+  RAG_INTERNAL_SECRET: z.string().optional(),
 });
 
 const parseResult = envSchema.safeParse(process.env);

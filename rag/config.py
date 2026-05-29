@@ -17,3 +17,5 @@ COLLECTION_NAME: str = os.getenv("COLLECTION_NAME", "flights")
 
 EMBED_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
 RETRIEVE_N: int = int(os.getenv("RETRIEVE_N", "5"))
+
+RAG_INTERNAL_SECRET: str = os.getenv("RAG_INTERNAL_SECRET", "")

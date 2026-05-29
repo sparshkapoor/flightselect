@@ -1,4 +1,5 @@
-import type { Flight } from '@flightselect/shared';
+import { useState } from 'react';
+import type { Flight, BookingOption } from '@flightselect/shared';
 import { PriceTag } from './PriceTag';
 import { FlightTimeline } from './FlightTimeline';
 import { CABIN_CLASS_LABELS } from '../../utils/constants';
@@ -36,10 +37,31 @@ function airlineColor(name: string): string {
 }
 
 export function FlightCard({ flight, selected, onSelect }: FlightCardProps) {
+  const [bookingOptions, setBookingOptions] = useState<BookingOption[] | null>(null);
+  const [loadingOptions, setLoadingOptions] = useState(false);
+  const [optionsError, setOptionsError] = useState<string | null>(null);
+
   const handleBookingClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (flight.bookingUrl) {
       window.open(flight.bookingUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  const handleViewOptions = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (bookingOptions !== null) return;
+    setLoadingOptions(true);
+    setOptionsError(null);
+    try {
+      const res = await fetch(`/api/flights/${flight.id}/booking-options`);
+      const data = await res.json();
+      setBookingOptions(data.options ?? []);
+      if (data.message && !data.options?.length) setOptionsError(data.message);
+    } catch {
+      setOptionsError('Failed to load booking options');
+    } finally {
+      setLoadingOptions(false);
     }
   };
 
@@ -86,6 +108,33 @@ export function FlightCard({ flight, selected, onSelect }: FlightCardProps) {
           >
             Book on Google Flights →
           </button>
+        )}
+        <button
+          onClick={handleViewOptions}
+          disabled={loadingOptions}
+          className="mt-1 text-xs text-gray-500 hover:text-gray-700 hover:underline disabled:opacity-50"
+        >
+          {loadingOptions ? 'Loading...' : bookingOptions !== null ? 'Sellers loaded' : 'View booking options'}
+        </button>
+        {bookingOptions !== null && bookingOptions.length > 0 && (
+          <div className="mt-1.5 space-y-1 text-left">
+            {bookingOptions.map((opt, i) => (
+              <a
+                key={i}
+                href={opt.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="flex justify-between items-center text-xs text-brand-700 hover:underline"
+              >
+                <span>{opt.seller}</span>
+                <span className="ml-2 font-semibold">${opt.price}</span>
+              </a>
+            ))}
+          </div>
+        )}
+        {optionsError && (
+          <div className="mt-1 text-xs text-gray-400">{optionsError}</div>
         )}
       </div>
     </div>

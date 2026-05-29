@@ -9,9 +9,10 @@ import sys
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, field_validator
 
+from rag import config as cfg
 from rag.query import query
 
 logging.basicConfig(
@@ -52,6 +53,11 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="FlightSelect RAG", lifespan=lifespan)
 
 
+async def _verify_secret(x_rag_secret: str | None = Header(default=None)) -> None:
+    if cfg.RAG_INTERNAL_SECRET and x_rag_secret != cfg.RAG_INTERNAL_SECRET:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
 class QueryRequest(BaseModel):
     question: str
     n_results: int = 5
@@ -69,7 +75,7 @@ class QueryResponse(BaseModel):
     answer: str
 
 
-@app.post("/query", response_model=QueryResponse)
+@app.post("/query", response_model=QueryResponse, dependencies=[Depends(_verify_secret)])
 async def handle_query(req: QueryRequest) -> QueryResponse:
     key = _cache_key(req.question, req.mode)
     cached = _get_cached(key)

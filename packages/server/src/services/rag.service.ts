@@ -1,4 +1,5 @@
 import { logger } from '../utils/logger';
+import { env } from '../config/env';
 
 const RAG_BASE_URL = process.env.RAG_URL ?? 'http://localhost:8000';
 
@@ -14,7 +15,10 @@ export async function queryRag(
   try {
     const res = await fetch(`${RAG_BASE_URL}/query`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(env.RAG_INTERNAL_SECRET ? { 'X-RAG-Secret': env.RAG_INTERNAL_SECRET } : {}),
+      },
       body: JSON.stringify({ question, n_results: nResults, mode }),
       signal: AbortSignal.timeout(120_000),
     });

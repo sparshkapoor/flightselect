@@ -53,7 +53,7 @@ function formatDate(date: Date | string): string {
   return date.toISOString().split('T')[0];
 }
 
-function buildGoogleFlightsUrl(
+export function buildGoogleFlightsUrl(
   origin: string,
   destination: string,
   departureDate: string,
@@ -66,7 +66,7 @@ function buildGoogleFlightsUrl(
   return base;
 }
 
-function normalizeFlight(
+export function normalizeFlight(
   result: SerpApiFlightResult,
   passengers: number,
   cabinClass: CabinClass,
@@ -102,6 +102,9 @@ function normalizeFlight(
         const gap = Math.round((seg2Departure.getTime() - seg1Arrival.getTime()) / 60000);
         if (gap > 0) layoverDuration = gap;
       }
+    }
+    if (!layoverAirport) {
+      logger.warn(`hasLayover=true but layoverAirport is null for flight ${firstSegment.flight_number} — SerpAPI may have omitted arrival_airport.id`);
     }
   }
 

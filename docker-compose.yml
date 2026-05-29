@@ -42,6 +42,65 @@ services:
     depends_on:
       - postgres
 
+  api:
+    build:
+      context: .
+      dockerfile: packages/server/Dockerfile
+    container_name: flightselect_api
+    env_file:
+      - packages/server/.env
+    environment:
+      DATABASE_URL: postgresql://flightselect:${DB_PASSWORD:-flightselect_password}@postgres:5432/flightselect_db
+      REDIS_URL: redis://redis:6379
+      RAG_URL: http://rag:8000
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
+      NODE_ENV: production
+    ports:
+      - '3001:3001'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:3001/api/health || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  rag:
+    build:
+      context: .
+      dockerfile: rag/Dockerfile
+    container_name: flightselect_rag
+    env_file:
+      - .env
+    environment:
+      OLLAMA_BASE_URL: http://host.docker.internal:11434/v1
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    volumes:
+      - chroma_data:/app/data/chroma
+      - hf_cache:/root/.cache/huggingface
+    healthcheck:
+      test: ['CMD-SHELL', 'python -c "import urllib.request; urllib.request.urlopen(''http://localhost:8000/health'')"']
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  nginx:
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile
+    container_name: flightselect_nginx
+    ports:
+      - '80:80'
+    depends_on:
+      api:
+        condition: service_healthy
+
 volumes:
   postgres_data:
   redis_data:
+  chroma_data:
+  hf_cache:

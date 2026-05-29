@@ -2,39 +2,41 @@
 
 > Compare round-trip vs. one-way flight pricing to find the cheapest booking strategy.
 
-FlightSelect answers a simple question: *should you book a round-trip ticket, or would two separate one-way tickets be cheaper?* It aggregates real flight data via the SerpAPI Google Flights API, computes side-by-side price comparisons, and surfaces the best option.
+FlightSelect answers one question: *should you book a round-trip ticket, or would two separate one-way tickets be cheaper?* It scrapes real flight data via SerpAPI, computes side-by-side price comparisons, and surfaces the best option — augmented by a local RAG pipeline that answers natural-language questions about the results.
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         FlightSelect                            │
-│                                                                 │
-│  ┌──────────┐    REST API     ┌──────────────────────────────┐  │
-│  │          │ ──────────────► │  Express + TypeScript        │  │
-│  │  React   │                 │  Server (port 3001)          │  │
-│  │  Client  │ ◄────────────── │                              │  │
-│  │ (port    │                 │  ┌──────────┐ ┌──────────┐   │  │
-│  │  5173)   │                 │  │ SerpAPI  │ │  BullMQ  │   │  │
-│  └──────────┘                 │  │  Google  │◄│  Jobs    │   │  │
-│                               │  │  Flights │ └────┬─────┘   │  │
-│                               │  │          │      │         │  │
-│                               │  │          │      ▼         │  │
-│                               │  └──────────┘ ┌──────────┐   │  │
-│                               │               │  Redis   │   │  │
-│                               │  ┌──────────┐ └──────────┘   │  │
-│                               │  │  Prisma  │                │  │
-│                               │  │  (ORM)   │                │  │
-│                               │  └────┬─────┘                │  │
-│                               │       │                      │  │
-│                               │       ▼                      │  │
-│                               │  ┌──────────┐                │  │
-│                               │  │PostgreSQL│                │  │
-│                               │  └──────────┘                │  │
-│                               └──────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                            FlightSelect                              │
+│                                                                      │
+│  ┌──────────┐   nginx (80)   ┌──────────────────────────────────┐   │
+│  │  React   │ ◄────────────► │  Express + TypeScript (3001)     │   │
+│  │  Client  │  /api proxy    │                                  │   │
+│  │  (Vite)  │                │  ┌──────────┐  ┌─────────────┐  │   │
+│  └──────────┘                │  │  SerpAPI │  │  BullMQ     │  │   │
+│                              │  │  Google  │◄─│  Job Queue  │  │   │
+│                              │  │  Flights │  └──────┬──────┘  │   │
+│                              │  └──────────┘         │         │   │
+│                              │                        ▼         │   │
+│                              │  ┌──────────┐  ┌─────────────┐  │   │
+│                              │  │  Prisma  │  │   Redis 7   │  │   │
+│                              │  │  (ORM)   │  └─────────────┘  │   │
+│                              │  └────┬─────┘                   │   │
+│                              │       ▼                         │   │
+│                              │  ┌──────────┐                   │   │
+│                              │  │PostgreSQL│                   │   │
+│                              │  └──────────┘                   │   │
+│                              └──────────────────────────────────┘   │
+│                                        │ internal Docker network    │
+│                              ┌─────────▼────────────────────────┐   │
+│                              │  FastAPI RAG (8000, not exposed)  │   │
+│                              │  ChromaDB · MiniLM · Ollama/      │   │
+│                              │  Gemini fallback                  │   │
+│                              └──────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -44,58 +46,114 @@ FlightSelect answers a simple question: *should you book a round-trip ticket, or
 | Layer | Technology |
 |---|---|
 | Frontend | React 18, TypeScript, Vite, TailwindCSS |
-| State | Zustand (client state), TanStack Query (server state) |
-| Charts | Recharts |
-| Routing | React Router v6 |
+| State | Zustand (client), TanStack Query (server state) |
 | Backend | Node.js, Express, TypeScript |
 | ORM | Prisma |
 | Database | PostgreSQL 15 |
 | Cache / Queue | Redis 7, BullMQ |
-| Validation | Zod (shared between client and server) |
+| Validation | Zod (shared client + server) |
 | Logging | Pino |
+| RAG | FastAPI, ChromaDB, sentence-transformers, Ollama |
+| Reverse proxy | nginx |
+| Testing | Vitest, Testing Library, pytest |
+| CI/CD | GitHub Actions → ghcr.io → SSH deploy |
 
 ---
 
 ## Prerequisites
 
-- **Node.js** 18+
-- **npm** 8+ (workspaces support)
-- **Docker** + Docker Compose (for PostgreSQL, Redis, pgAdmin)
+**Dev:**
+- Node.js 20+
+- npm 8+ (workspaces)
+- Docker + Docker Compose
+- Python 3.11+ (for RAG service)
+- [Ollama](https://ollama.ai) (`ollama serve` + `ollama pull qwen2.5:1.5b`)
+
+**Self-hosted (Docker full stack):**
+- Docker + Docker Compose
+- Ollama running on the host (`ollama serve`)
 
 ---
 
-## Quick Start
+## Quick Start (dev)
 
 ```bash
-# 1. Clone the repository
+# 1. Clone
 git clone https://github.com/sparshkapoor/flightselect.git
 cd flightselect
 
-# 2. Install all dependencies (all workspaces)
+# 2. Install all dependencies
 npm install
+pip install -r rag/requirements.txt
 
-# 3. Start infrastructure (Postgres + Redis + pgAdmin)
+# 3. Start Postgres + Redis
 npm run docker:up
 
-# 4. Copy environment files
+# 4. Copy env files and fill in your keys
 cp packages/server/.env.example packages/server/.env
-cp packages/client/.env.example packages/client/.env
+cp .env.example .env
 
-# 5. Run database migrations
+# 5. Run DB migrations
 npm run db:migrate
 
-# 6. Seed the database with sample data
+# 6. (Optional) Seed sample data
 npm run db:seed
 
-# 7. Start both client and server in development mode
-npm run dev
+# 7. Start everything
+npm run dev          # Express + Vite
+# In a second terminal:
+uvicorn rag.server:app --host 0.0.0.0 --port 8000
 ```
 
-The app will be available at:
-- **Frontend:** http://localhost:5173
-- **Backend API:** http://localhost:3001/api
-- **pgAdmin:** http://localhost:5050 (admin@flightselect.dev / admin_password)
-- **Prisma Studio:** Run `npm run db:studio`
+| Service | URL |
+|---|---|
+| Frontend | http://localhost:5173 |
+| API | http://localhost:3001/api |
+| RAG | http://localhost:8000 (internal only in prod) |
+| pgAdmin | http://localhost:5050 |
+
+---
+
+## Docker (full stack)
+
+`docker-compose up --build` starts everything: Postgres, Redis, Express API, FastAPI RAG, and nginx serving the React build.
+
+```bash
+# Copy and configure env files first
+cp packages/server/.env.example packages/server/.env
+cp .env.example .env
+# Edit both files with your SERPAPI_API_KEY, RAG_INTERNAL_SECRET, etc.
+
+docker-compose up --build
+```
+
+Ollama must be running on the host (`ollama serve`). The RAG container reaches it via `host.docker.internal:11434`.
+
+**HTTPS:** Front nginx with Certbot or a cloud load balancer — the base compose does not bundle TLS.
+
+---
+
+## Environment Variables
+
+**`packages/server/.env`**
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `DATABASE_URL` | Yes | — | Postgres connection string |
+| `REDIS_URL` | Yes | — | Redis connection string |
+| `SERPAPI_API_KEY` | Yes | — | SerpAPI key |
+| `CORS_ORIGIN` | No | `http://localhost:5173` | Allowed CORS origin |
+| `RAG_URL` | No | `http://localhost:8000` | FastAPI RAG base URL |
+| `RAG_INTERNAL_SECRET` | No | — | Shared secret for Express→RAG requests |
+
+**`.env` (root, Python RAG)**
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `RAG_BACKEND` | No | `ollama` | `ollama` or `gemini` |
+| `OLLAMA_MODEL` | No | `qwen2.5:1.5b` | Ollama model name |
+| `GEMINI_API_KEY` | No | — | Gemini fallback key |
+| `RAG_INTERNAL_SECRET` | No | — | Must match server-side value |
 
 ---
 
@@ -103,39 +161,38 @@ The app will be available at:
 
 ```
 flightselect/
-├── docker-compose.yml          # PostgreSQL, Redis, pgAdmin
-├── package.json                # Root: npm workspaces + scripts
-├── tsconfig.json               # Root TypeScript config (project references)
-├── .eslintrc.js                # Shared ESLint config
-├── .prettierrc                 # Shared Prettier config
-└── packages/
-    ├── shared/                 # @flightselect/shared
-    │   └── src/
-    │       ├── enums.ts        # CabinClass, TripType, RecommendedOption
-    │       ├── types.ts        # Domain types + API request/response shapes
-    │       ├── schemas.ts      # Zod validation schemas (shared client+server)
-    │       └── index.ts        # Barrel export
-    ├── server/                 # @flightselect/server
-    │   ├── prisma/
-    │   │   ├── schema.prisma   # DB models: User, SearchQuery, Flight, Comparison, SavedSearch
-    │   │   └── seed.ts         # Sample data seeder
-    │   └── src/
-    │       ├── config/         # Env, DB (Prisma), Redis setup
-    │       ├── routes/         # Express route definitions
-    │       ├── controllers/    # Request handlers
-    │       ├── services/       # Business logic (search, flight, comparison, cache, AI)
-    │       ├── scrapers/       # Scraper interface + Mock, Google, Skyscanner, Amadeus stubs
-    │       ├── jobs/           # BullMQ queue setup + job processors
-    │       ├── middleware/     # Error handling, validation, rate limiting
-    │       └── utils/          # Logger, airport utilities, pricing helpers
-    └── client/                 # @flightselect/client
-        └── src/
-            ├── api/            # Axios-based API client
-            ├── components/     # React components (search, results, comparison, filters, common, layout)
-            ├── hooks/          # React Query + Zustand hooks
-            ├── pages/          # Route-level page components
-            ├── stores/         # Zustand stores (search, filter, user)
-            └── utils/          # Formatters, airport data, constants
+├── docker-compose.yml          # Full stack: Postgres, Redis, API, RAG, nginx
+├── nginx/
+│   ├── Dockerfile              # Builds React, serves static + proxies /api/
+│   └── nginx.conf
+├── .github/workflows/
+│   ├── ci.yml                  # Tests (client, server, RAG) + TS build on every push/PR
+│   └── cd.yml                  # Build images → ghcr.io → SSH deploy on main merge
+├── packages/
+│   ├── shared/                 # @flightselect/shared — types, enums, Zod schemas
+│   ├── server/                 # Express API
+│   │   ├── Dockerfile
+│   │   ├── prisma/             # Schema + migrations
+│   │   └── src/
+│   │       ├── config/         # Env (Zod), DB, Redis
+│   │       ├── routes/         # REST endpoints
+│   │       ├── controllers/    # Request handlers
+│   │       ├── services/       # Business logic (search, comparison, RAG proxy, booking)
+│   │       ├── scrapers/       # Google Flights (SerpAPI)
+│   │       ├── jobs/           # BullMQ search + comparison jobs
+│   │       └── middleware/     # Error, validation, rate limiting
+│   └── client/                 # React + Vite
+│       └── src/
+│           ├── components/     # FlightCard, FilterSidebar, AIInsightCard, …
+│           ├── pages/          # SearchResultsPage, ComparisonPage, …
+│           ├── stores/         # Zustand (filter, search, user)
+│           └── test/           # Vitest test files
+└── rag/                        # FastAPI RAG service
+    ├── Dockerfile
+    ├── server.py               # FastAPI app, in-memory cache, secret verification
+    ├── query.py                # ChromaDB retrieval + LLM call
+    ├── ingest.py               # CSV → ChromaDB ingestion
+    └── config.py               # Env config
 ```
 
 ---
@@ -144,31 +201,55 @@ flightselect/
 
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/api/health` | Health check (DB + Redis status) |
-| POST | `/api/search` | Create a new flight search |
-| GET | `/api/search/:id` | Get search results by ID |
-| GET | `/api/flights` | List flights (optional `?searchQueryId=`) |
-| GET | `/api/flights/:id` | Get a specific flight |
-| GET | `/api/comparison` | Get comparisons for a query (`?searchQueryId=`) |
-| GET | `/api/comparison/:id` | Get a specific comparison with flight details |
-| POST | `/api/users` | Create a user |
-| GET | `/api/users/:id` | Get a user |
-| PUT | `/api/users/:id` | Update a user |
-| DELETE | `/api/users/:id` | Delete a user |
+| GET | `/api/health` | Health check (DB + Redis) |
+| POST | `/api/search` | Create a flight search |
+| GET | `/api/search/:id` | Poll search results |
+| GET | `/api/flights` | List flights (`?searchQueryId=`) |
+| GET | `/api/flights/:id` | Get a flight |
+| GET | `/api/flights/:id/booking-options` | Fetch live booking options from SerpAPI |
+| GET | `/api/comparison` | List comparisons (`?searchQueryId=`) |
+| GET | `/api/comparison/:id` | Get comparison with flights |
+| POST | `/api/rag/query` | Ask a natural-language question about flights |
+| POST | `/api/users` | Create user |
+| GET/PUT/DELETE | `/api/users/:id` | User CRUD |
 
 ---
 
-## Contributing
+## Tests
 
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/my-feature`
-3. Make your changes following the existing code style
-4. Run lint: `npm run lint`
-5. Format: `npm run format`
-6. Submit a PR with a clear description of what you changed and why
+```bash
+# Client (Vitest + jsdom)
+npm run test --workspace=packages/client
+
+# Server (Vitest + mocked Redis)
+npm run test --workspace=packages/server
+
+# Python RAG (pytest)
+pip install -r rag/requirements-dev.txt
+pytest rag/tests/ -v
+```
+
+CI runs all three on every push and PR via GitHub Actions.
+
+---
+
+## Re-ingesting ChromaDB
+
+After new searches accumulate, export fresh flight data and re-ingest:
+
+```bash
+psql "$DATABASE_URL" -c "\COPY (
+  SELECT \"departureAirport\" AS origin, \"arrivalAirport\" AS destination,
+         DATE(\"departureTime\") AS date, ROUND(price::numeric,0) AS price,
+         airline, \"durationMinutes\" AS duration_minutes
+  FROM \"Flight\"
+) TO '$(pwd)/data/flights/flights.csv' CSV HEADER"
+
+python -m rag.ingest data/flights/flights.csv
+```
 
 ---
 
 ## License
 
-MIT © FlightSelect Contributors
+MIT © Sparsh Kapoor
