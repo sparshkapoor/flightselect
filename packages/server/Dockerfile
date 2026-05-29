@@ -1,6 +1,7 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
+COPY tsconfig.json ./
 COPY packages/shared/package*.json ./packages/shared/
 COPY packages/server/package*.json ./packages/server/
 RUN npm ci --workspace=packages/shared --workspace=packages/server
