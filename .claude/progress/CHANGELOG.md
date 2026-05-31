@@ -409,3 +409,294 @@ Added a temporary force-429 block in `serpApiRateLimit.middleware.ts` so user co
 3. **RAG pipeline** — Next major feature: historical flight pricing data + LLM query layer.
 4. **Direct airline booking links** — `booking_token` stored, follow-up SerpAPI call not yet implemented.
 5. **Personal website fade-in transition** — Separate project at `~/Personal Website/`.
+
+---
+
+## Session 6 (2026-04-01)
+
+### Context
+Blog post restructuring, architecture clarification, and decisions on the storage layer going forward.
+
+---
+
+### 1. Blog Post Restructured
+
+Rewrote `blog/post.md` for narrative clarity and correct chronological order:
+
+- **ToC updated** — swapped "Usage Limits" and "Is Everything Correct?" to reflect the actual build order
+- **TL;DR section added** — placed after ToC, before "The Idea". Lists 7 common problems + fixes for anyone cloning the repo
+- **"Session 1" heading removed** — content folded into a closing paragraph under "The Missing Pieces" with a bridge sentence connecting to SerpAPI
+- **"Is Everything Correct?" restructured** — SerpAPI scraper bugs, comparison engine rewrite, and filter fixes each get their own paragraph in build order. Screenshot placeholder moved here
+- **"Usage Limits" now correctly follows** — reads as a consequence of going live with real data, not a precursor to debugging
+- **Claude quote formatted as blockquote** in "What's Next"
+- Minor: double blank line removed, "API" capitalized consistently
+
+---
+
+### 2. PostgreSQL Decision — Keep As-Is
+
+User questioned whether Postgres was necessary since Redis was already running. Clarified the division:
+- **PostgreSQL** = permanent storage for SearchQuery, Flight, Comparison records. The scraper, comparison engine, all jobs, and controllers depend on it.
+- **Redis** = ephemeral. Handles BullMQ job queue (consumed and discarded) and rate limiter TTL counters. Not a database replacement.
+
+**Decision**: Keep Postgres for now (Option 1). When the RAG pipeline is built, a vector DB will be introduced alongside it. Postgres can be phased out at that point if no longer needed — but removing it now would break the entire persistence layer.
+
+---
+
+### Outstanding Issues (as of end of session 6)
+1. **Blog post screenshots** — 4 placeholders still need real screenshots inserted: homepage, Claude debugging session, comparison view, 429 error.
+2. **RAG pipeline** — Next major feature. PostgreSQL stays until vector DB is introduced.
+3. **Direct airline booking links** — `booking_token` in rawData, follow-up SerpAPI call not implemented.
+4. **Filters** — Price slider, layover count, sort all need polish.
+5. **Personal website fade-in** — Separate project, not started.
+
+---
+
+## Session 7 (2026-05-29)
+
+### Context
+Docker build was broken (TypeScript errors + Prisma version mismatch). User decided to rip out Prisma entirely since it was only used as a logging/storage layer and added too much Docker friction.
+
+---
+
+### 1. Fixed Docker TypeScript errors in comparison.job.ts
+
+- **Problem**: `tsc` in Docker failed with "Parameter implicitly has an 'any' type" on arrow function params in comparison.job.ts.
+- **Root cause**: `prisma generate` ran *after* `tsc` in the Dockerfile, so `@prisma/client` types weren't available at compile time.
+- **Fix**: Moved `prisma generate` before `tsc` in the builder stage; added explicit `Flight` type annotations.
+- **Files**: `packages/server/Dockerfile`, `packages/server/src/jobs/comparison.job.ts`
+
+### 2. Fixed Prisma version mismatch at runtime
+
+- **Problem**: `docker-entrypoint.sh` used `npx prisma migrate deploy`, which pulled Prisma 7 at runtime. Project pins `^5.13.0`. Prisma 7 dropped support for `url` in `schema.prisma`.
+- **Fix attempted**: Pin to local binary, add OpenSSL, fix binary targets — each revealed a new layer of Prisma Docker complexity.
+
+### 3. Removed Prisma entirely — replaced with raw `pg`
+
+User decision: Prisma's Docker overhead (binary targets, OpenSSL, generate step, version pinning) wasn't worth it for a simple storage layer.
+
+**What changed:**
+- Removed `@prisma/client` and `prisma` from `packages/server/package.json`; added `pg` and `@types/pg`
+- Deleted dependency on `prisma/schema.prisma` for runtime — replaced with `packages/server/schema.sql` (idempotent, IF NOT EXISTS, runs via `node dist/config/migrate.js` at startup)
+- New `src/config/database.ts`: `pg.Pool` + typed `query<T>()` / `queryOne<T>()` helpers
+- New `src/config/migrate.ts`: reads `schema.sql`, runs it against Postgres, exits
+- New `src/types/db.ts`: TypeScript interfaces for all DB rows (DbUser, DbSearchQuery, DbFlight, DbComparison)
+- Rewrote all 9 files that used Prisma: `search.job.ts`, `comparison.job.ts`, `search.service.ts`, `flight.service.ts`, `comparison.service.ts`, `bookingOptions.service.ts`, `user.controller.ts`, `health.routes.ts`
+- Simplified `packages/server/Dockerfile`: no `prisma generate`, no OpenSSL install, no `.prisma` directory copy
+- `docker-entrypoint.sh`: now runs `node dist/config/migrate.js` instead of `npx prisma migrate deploy`
+- Updated README architecture diagram and tech stack table (Prisma → `pg` raw SQL)
+- Updated INSTRUCTIONS.md with new gotchas (camelCase column quoting, DECIMAL as string, UUID generation)
+
+**Key gotchas preserved in DB schema:**
+- Column names are camelCase (Prisma legacy) — all SQL must quote them: `"searchQueryId"`, `"departureAirport"`, etc.
+- DECIMAL columns returned as strings by pg — use `Number()` before arithmetic
+- IDs generated with `crypto.randomUUID()` in application code
+
+### Outstanding Issues (as of end of session 7)
+1. **nginx port 80 conflict** — host machine has something on port 80; nginx container fails to start. Not introduced by this session.
+2. **Blog post screenshots** — unchanged from session 6.
+3. **RAG pipeline** — unchanged from session 6.
+4. **Direct airline booking links** — unchanged from session 6.
+5. **Filters** — unchanged from session 6.
+
+---
+
+## Session 8 (2026-05-30)
+
+### Context
+Three bugs identified in prior session. Two utility files (`flightComparison.ts`, `flightComparison.test.ts`) were already written. This session implemented the remaining fixes.
+
+---
+
+### Bug 1 — Airline filter didn't update comparison card
+
+**Problem**: Filtering by airline in `FilterSidebar` had no effect on the "Same Airline vs Best Mix" comparison card — it kept showing server-computed prices regardless of the active filter.
+
+**Root cause**: `SearchResultsPage` passed `latestComparison` (server-computed) directly to `ComparisonView` with no client-side recomputation when `filterStore.selectedAirlines` changed.
+
+**Fix** (`packages/client/src/pages/SearchResultsPage.tsx`):
+- Imported `computeFilteredComparison` from `../utils/flightComparison`
+- Added `activeComparison` memo: when `selectedAirlines.length > 0`, calls `computeFilteredComparison(filteredOutbound, filteredReturn, latestComparison)`; otherwise passes `latestComparison` unchanged
+- `ComparisonView` now receives `activeComparison` instead of `latestComparison`
+
+---
+
+### Bug 2 — Round-trip search mixed outbound + return flights in one list
+
+**Problem**: EWR→SFO round-trip search showed all 38 flights (20 outbound + 18 return) in a single list. Return flights (SFO→EWR) appeared in the outbound section.
+
+**Root cause**: `SearchResultsPage` fed `allFlights` directly into `filteredAndSortedFlights` with no direction filtering. `FilterSidebar` received `allFlights` too, so airline counts included both directions.
+
+**Fix** (`packages/client/src/pages/SearchResultsPage.tsx`):
+- Imported `splitFlightsByDirection` from `../utils/flightComparison`
+- Extracted `originAirport`, `destinationAirport`, `tripType` from `searchData`
+- Split `allFlights` into `outboundFlights` / `returnFlights` via `splitFlightsByDirection`
+- `filteredAndSortedFlights` now filters from `outboundFlights` only
+- `FilterSidebar` now receives `outboundFlights` (airline counts reflect outbound only)
+- For `ROUND_TRIP` searches, a second `ResultsContainer` renders below with `filteredAndSortedReturnFlights`
+- `allFlights` is still used as the ID-lookup pool for `ComparisonView` (IDs can be either direction)
+
+---
+
+### Bug 3a — Booking-options endpoint used 60s search rate limit
+
+**Problem**: Clicking "View Booking Options" triggered the search rate limiter (60s window), so a second click within 60s was blocked with a 429.
+
+**Root cause**: `flights.routes.ts` applied `serpApiRateLimit` (60s) to `/:id/booking-options`. That limiter was designed for full search queries, not per-flight booking lookups.
+
+**Fix**:
+- `packages/server/src/middleware/serpApiRateLimit.middleware.ts`: Refactored `serpApiRateLimit` into a `createSerpApiRateLimit(clientWindowSeconds)` factory. The existing `export const serpApiRateLimit = createSerpApiRateLimit(60)` preserves the search endpoint behavior.
+- `packages/server/src/routes/flights.routes.ts`: Created `bookingOptionsRateLimit = createSerpApiRateLimit(5)` and applied it to `/:id/booking-options`.
+
+---
+
+### Bug 3b — "View Booking Options" button permanently stuck after rate-limit error
+
+**Problem**: After a 429 from the booking-options endpoint, `bookingOptions` was set to `[]`. The button condition `bookingOptions !== null` then showed "Sellers loaded" permanently, blocking retry.
+
+**Fix** (`packages/client/src/components/results/FlightCard.tsx`):
+- `handleViewOptions`: only calls `setBookingOptions(data.options ?? [])` when `res.ok`
+- On non-ok responses, sets `optionsError` only — `bookingOptions` stays `null` so the button remains clickable
+
+---
+
+### Tests
+- `packages/server/src/middleware/serpApiRateLimit.test.ts`: Added `describe('createSerpApiRateLimit')` block (4 new tests: passes with 5s window, sets Redis EX to provided value, blocks global monthly, confirms 60s equivalent)
+- `packages/client/src/test/flightComparison.test.ts`: Pre-existing tests all pass (17 tests)
+- Fixed branded `IATACode` TypeScript error in test fixture parameter type
+
+**All tests pass**: 16 server + 38 client = 54 total.
+
+### Outstanding Issues (as of end of session 8)
+1. **nginx port 80 conflict** — unchanged from session 7.
+2. **Blog post screenshots** — unchanged from session 6.
+3. **RAG pipeline** — unchanged from session 6.
+4. **Direct airline booking links** — unchanged from session 6.
+5. **Docker rebuild needed** for server-side rate limiter change: `docker compose up -d --build api`
+
+---
+
+## Session 9 (2026-05-30)
+
+### Context
+Four regressions from session 8 fixed: filter pre-population bug, Docker not rebuilt, window.open blank tab, RAG never ingesting data.
+
+---
+
+### Bug B — Docker API container rebuild
+
+Ran `docker compose up -d --build api`. The container was still running session 7 code; session 8's `createSerpApiRateLimit(5)` for the booking-options endpoint was not live until now.
+
+---
+
+### Bug C — "0 of 16 flights" with no visible filter
+
+**Fix** (`packages/client/src/pages/SearchResultsPage.tsx`):
+Changed `allFlights.map((f) => f.airline)` → `outboundFlights.map((f) => f.airline)` in the `preferredAirlines` pre-population `useEffect`. The previous code matched preferred airlines against all 38 flights (both directions), so an airline present only in the return leg got added to `selectedAirlines`, but `FilterSidebar` (which shows outbound airlines only) never rendered its checkbox — leaving the user with 0 results and no way to clear the filter.
+
+---
+
+### Bug D — "Book on Google Flights" opens blank tab
+
+**Fix** (`packages/client/src/components/results/FlightCard.tsx`):
+Replaced `window.open(gf?.url ?? flight.bookingUrl ?? '', ...)` with a null-guarded `const url = gf?.url ?? flight.bookingUrl; if (url) window.open(url, ...)` in both the cached-options path and the fresh-fetch path. When both the booking-options API URL and `flight.bookingUrl` are null, the button now silently no-ops instead of opening a blank tab. The catch-block fallback was already guarded (`if (flight.bookingUrl) window.open(...)`).
+
+---
+
+### Bug A — AI Insight always "No relevant flight data found"
+
+**Root cause:** `rag/server.py` had no HTTP ingest endpoint. `rag/ingest.py` was CLI-only (reads from CSV files on disk). ChromaDB was never populated after a search completed.
+
+**Fix — `rag/server.py`:**
+Added `POST /ingest` endpoint protected by the existing `_verify_secret` dependency. Accepts `{ search_query_id, flights: [{origin, destination, date, price, airline, duration_minutes}] }`. Converts each record to a natural-language document string, embeds with `embed()`, writes to ChromaDB via `vs_ingest()`. Returns `{ ingested: N }`.
+
+**Fix — `packages/server/src/config/env.ts`:**
+Added `RAG_URL` to the Zod schema (was in `.env` and `docker-compose.yml` but not validated). Defaults to `http://localhost:8000`.
+
+**Fix — `packages/server/src/jobs/search.job.ts`:**
+After flights are saved to Postgres and the comparison job runs, fires a POST to `${RAG_URL}/ingest` with the search's flights. Sends `x-rag-secret` header when configured. Fire-and-forget: `.catch()` logs a warning so RAG being down cannot fail the search job.
+
+---
+
+### Tests
+
+All tests pass: 16 server + 38 client = 54 total (unchanged count — no new test files added this session).
+
+### Outstanding Issues (as of end of session 9)
+1. **nginx port 80 conflict** — unchanged from session 7.
+2. **Blog post screenshots** — unchanged from session 6.
+3. **Direct airline booking links** — unchanged from session 6.
+
+---
+
+## Session 10 (2026-05-31)
+
+### Context
+"Book on Google Flights" button was opening the wrong page: SerpAPI's booking token resolution always returns a round-trip tfs URL (outbound pre-selected, showing return leg picker) regardless of `type=2` in the resolution call — the token itself carries round-trip context. Also, `bookingUrl` was being baked into the DB at scrape time with stale/wrong values.
+
+---
+
+### 1. Fixed `bookingOptions.service.ts` — use `type: '2'` always
+
+Changed `type: isRoundTrip ? '1' : '2'` to `type: '2'` and removed the `return_date` param and `searchQuery` lookup. Booking tokens from our scraper come from one-way searches so the resolution must also be one-way. Removed unused `isRoundTrip`, `returnDate`, `searchQuery` variables and `DbSearchQuery` import.
+
+**Files**: `packages/server/src/services/bookingOptions.service.ts`
+
+---
+
+### 2. Removed `+return+` from `buildGoogleFlightsUrl`
+
+The fallback `bookingUrl` was built with `+return+DATE` suffix which caused Google Flights to open in round-trip mode showing SFO→EWR when clicking on an EWR→SFO flight. Removed the `returnDate` parameter entirely from `buildGoogleFlightsUrl`, `normalizeFlight`, and `fetchOneWay`. Also removed `returnDateForUrl` param from `fetchOneWay` call in the scraper.
+
+**Files**: `packages/server/src/scrapers/google-flights/index.ts`
+
+---
+
+### 3. Simplified `FlightCard.tsx` — "Book on Google Flights" no longer uses SerpAPI URL
+
+Removed `specificGoogleUrl` and `fetchingGoogleUrl` state. `handleBookingClick` now just opens `flight.bookingUrl` directly. The booking options API (for seller prices) is fully decoupled from the Google Flights button. `fetchAndCacheOptions` no longer sets `specificGoogleUrl`.
+
+**Root cause discovered**: Even after fixing `type: '2'`, SerpAPI's `search_metadata.google_flights_url` from booking token resolution was still returning a round-trip tfs (the token encodes round-trip context from the original itinerary). The only reliable fix is to not use SerpAPI's resolved URL for the button.
+
+**Files**: `packages/client/src/components/results/FlightCard.tsx`
+
+---
+
+### 4. Built Google Flights tfs URL from scratch
+
+SerpAPI's booking token always produces a round-trip tfs regardless of `type=2`. The fix: construct the one-way tfs protobuf ourselves from the flight data we already have (airline code, flight number, airports, departure date).
+
+**New file: `packages/server/src/utils/googleFlightsUrl.ts`**
+- `buildGoogleFlightsTfsUrl(dep, arr, date, airlineCode, flightNum)` — constructs a one-way Google Flights deep-link tfs URL using protobuf encoding reverse-engineered from the community (fast-flights, AWeirdDev/flights)
+- `buildGoogleFlightsSearchUrl(origin, dest, date)` — generic fallback
+- `deriveBookingUrl(flightNumber, dep, arr, departureTime)` — parses airline code from "UA 1343" format, returns tfs URL or search URL fallback
+
+**Protobuf structure**: encodes dep airport (field 1), date (field 2), arr airport (field 3), airline (field 5), flight number (field 6) in a one-way leg. Verified against known SerpAPI tfs output.
+
+---
+
+### 5. `bookingUrl` no longer cached in DB — derived fresh on every API response
+
+**Problem**: `bookingUrl` was baked into the DB at scrape time. Old searches had stale/wrong URLs. Users had to re-search to get fixed URLs.
+
+**Fix**:
+- `packages/server/src/services/flight.service.ts`: Added `withBookingUrl()` mapper that calls `deriveBookingUrl()` on every flight before returning it to the client. Applies to both `getFlights()` and `getFlightById()`. The DB value is ignored.
+- `packages/server/src/scrapers/google-flights/index.ts`: `normalizeFlight` now sets `bookingUrl: null` (scraper no longer computes it). Inline protobuf code removed from scraper — re-exported from `utils/googleFlightsUrl`.
+
+This means all flights — old and new — get correct tfs deep-links automatically. No migration needed.
+
+---
+
+### Tests
+
+All tests pass: 20 server + 38 client = 58 total (+3 new server tests).
+
+New tests in `packages/server/src/scrapers/google-flights/index.test.ts`:
+- `buildGoogleFlightsTfsUrl` — verifies tfs is valid base64url, decoded binary contains all flight identifiers
+- `deriveBookingUrl` — tfs URL for parseable flight number; search URL fallback for unparseable
+- `normalizeFlight bookingUrl` — verifies scraper sets `null` (not cached)
+
+### Outstanding Issues (as of end of session 10)
+1. **nginx port 80 conflict** — unchanged from session 7.
+2. **Blog post screenshots** — unchanged from session 6.
+3. **tfs URL real-world validation** — the protobuf format is reverse-engineered; if Google changes the tfs schema, URLs will silently break. Monitor post-deploy.

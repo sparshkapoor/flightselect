@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { normalizeFlight, buildGoogleFlightsUrl } from './index';
+import { buildGoogleFlightsTfsUrl, deriveBookingUrl } from '../../utils/googleFlightsUrl';
 import { CabinClass } from '@flightselect/shared';
 
 const seg = (departure: string, arrival: string, durationMinutes: number, airline = 'Delta', flightNumber = 'DL100') => ({
@@ -85,17 +86,55 @@ describe('normalizeFlight', () => {
 });
 
 describe('buildGoogleFlightsUrl', () => {
-  it('one-way: no returnDate in URL', () => {
+  it('produces a one-way search URL with no return date', () => {
     const url = buildGoogleFlightsUrl('JFK', 'LAX', '2024-06-01');
     expect(url).toContain('JFK');
     expect(url).toContain('LAX');
     expect(url).toContain('2024-06-01');
     expect(url).not.toContain('return');
   });
+});
 
-  it('round-trip: returnDate appended', () => {
-    const url = buildGoogleFlightsUrl('JFK', 'LAX', '2024-06-01', '2024-06-08');
-    expect(url).toContain('return');
-    expect(url).toContain('2024-06-08');
+describe('buildGoogleFlightsTfsUrl', () => {
+  it('produces a tfs deep-link URL for a specific one-way flight', () => {
+    const url = buildGoogleFlightsTfsUrl('EWR', 'SFO', '2026-06-17', 'UA', '1343');
+    expect(url).toContain('/search?tfs=');
+    expect(url).not.toContain('return');
+    const tfs = new URL(url).searchParams.get('tfs')!;
+    expect(tfs).toMatch(/^[A-Za-z0-9_-]+$/);
+    const decoded = Buffer.from(tfs, 'base64url').toString('binary');
+    expect(decoded).toContain('EWR');
+    expect(decoded).toContain('SFO');
+    expect(decoded).toContain('2026-06-17');
+    expect(decoded).toContain('UA');
+    expect(decoded).toContain('1343');
+  });
+});
+
+describe('deriveBookingUrl', () => {
+  it('returns a tfs URL for a parseable flight number', () => {
+    const url = deriveBookingUrl('UA 2058', 'EWR', 'SFO', new Date('2026-06-19T16:25:00'));
+    expect(url).toContain('/search?tfs=');
+    const tfs = new URL(url).searchParams.get('tfs')!;
+    const decoded = Buffer.from(tfs, 'base64url').toString('binary');
+    expect(decoded).toContain('EWR');
+    expect(decoded).toContain('SFO');
+    expect(decoded).toContain('2026-06-19');
+    expect(decoded).toContain('UA');
+    expect(decoded).toContain('2058');
+  });
+
+  it('falls back to search URL for unparseable flight number', () => {
+    const url = deriveBookingUrl('Unknown', 'EWR', 'SFO', new Date('2026-06-19T16:25:00'));
+    expect(url).toContain('?q=Flights+from+EWR+to+SFO');
+    expect(url).not.toContain('tfs=');
+    expect(url).not.toContain('return');
+  });
+});
+
+describe('normalizeFlight bookingUrl', () => {
+  it('does not set bookingUrl (derived by service layer, not cached)', () => {
+    const result = normalizeFlight(directResult as any, 1, CabinClass.ECONOMY, '2024-06-01');
+    expect(result.bookingUrl).toBeNull();
   });
 });

@@ -41,6 +41,17 @@ export function FlightCard({ flight, selected, onSelect }: FlightCardProps) {
   const [loadingOptions, setLoadingOptions] = useState(false);
   const [optionsError, setOptionsError] = useState<string | null>(null);
 
+  async function fetchAndCacheOptions(): Promise<void> {
+    const res = await fetch(`/api/flights/${flight.id}/booking-options`);
+    const data = await res.json();
+    if (!res.ok) throw Object.assign(new Error(data.message ?? 'Failed'), { status: res.status, data });
+    const options: BookingOption[] = data.options ?? [];
+    if (options.length === 0 && data.message) {
+      throw new Error(data.message);
+    }
+    setBookingOptions(options);
+  }
+
   const handleBookingClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (flight.bookingUrl) {
@@ -50,16 +61,14 @@ export function FlightCard({ flight, selected, onSelect }: FlightCardProps) {
 
   const handleViewOptions = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (bookingOptions !== null) return;
+    if (bookingOptions !== null && bookingOptions.length > 0) return;
     setLoadingOptions(true);
     setOptionsError(null);
     try {
-      const res = await fetch(`/api/flights/${flight.id}/booking-options`);
-      const data = await res.json();
-      setBookingOptions(data.options ?? []);
-      if (data.message && !data.options?.length) setOptionsError(data.message);
-    } catch {
-      setOptionsError('Failed to load booking options');
+      await fetchAndCacheOptions();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to load booking options';
+      setOptionsError(msg);
     } finally {
       setLoadingOptions(false);
     }
@@ -101,20 +110,24 @@ export function FlightCard({ flight, selected, onSelect }: FlightCardProps) {
       <div className="text-right shrink-0 flex flex-col items-end gap-0.5">
         <PriceTag amount={Number(flight.price)} currency={flight.currency} />
         <div className="text-xs text-gray-400">{CABIN_CLASS_LABELS[flight.cabinClass]}</div>
-        {flight.bookingUrl && (
-          <button
-            onClick={handleBookingClick}
-            className="mt-1.5 text-xs text-brand-600 hover:text-brand-800 font-semibold hover:underline"
-          >
-            Book on Google Flights →
-          </button>
-        )}
+        <button
+          onClick={handleBookingClick}
+          className="mt-1.5 text-xs text-brand-600 hover:text-brand-800 font-semibold hover:underline"
+        >
+          Book on Google Flights →
+        </button>
         <button
           onClick={handleViewOptions}
-          disabled={loadingOptions}
+          disabled={loadingOptions || (bookingOptions !== null && bookingOptions.length > 0)}
           className="mt-1 text-xs text-gray-500 hover:text-gray-700 hover:underline disabled:opacity-50"
         >
-          {loadingOptions ? 'Loading...' : bookingOptions !== null ? 'Sellers loaded' : 'View booking options'}
+          {loadingOptions
+            ? 'Loading...'
+            : bookingOptions !== null && bookingOptions.length > 0
+            ? 'Sellers loaded'
+            : bookingOptions !== null && bookingOptions.length === 0
+            ? 'No sellers found'
+            : 'View booking options'}
         </button>
         {bookingOptions !== null && bookingOptions.length > 0 && (
           <div className="mt-1.5 space-y-1 text-left">

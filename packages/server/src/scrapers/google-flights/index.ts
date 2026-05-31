@@ -53,25 +53,13 @@ function formatDate(date: Date | string): string {
   return date.toISOString().split('T')[0];
 }
 
-export function buildGoogleFlightsUrl(
-  origin: string,
-  destination: string,
-  departureDate: string,
-  returnDate?: string,
-): string {
-  const base = `https://www.google.com/travel/flights?q=Flights+from+${origin}+to+${destination}+on+${departureDate}`;
-  if (returnDate) {
-    return `${base}+return+${returnDate}`;
-  }
-  return base;
-}
+export { buildGoogleFlightsTfsUrl, buildGoogleFlightsSearchUrl as buildGoogleFlightsUrl } from '../../utils/googleFlightsUrl';
 
 export function normalizeFlight(
   result: SerpApiFlightResult,
   passengers: number,
   cabinClass: CabinClass,
   departureDate: string,
-  returnDate?: string,
 ): ScrapedFlight {
   const firstSegment = result.flights[0];
   const lastSegment = result.flights[result.flights.length - 1];
@@ -124,12 +112,7 @@ export function normalizeFlight(
     layoverDurationMinutes: layoverDuration,
     source: 'google-flights',
     scrapedAt: new Date(),
-    bookingUrl: buildGoogleFlightsUrl(
-      firstSegment.departure_airport.id,
-      lastSegment.arrival_airport.id,
-      departureDate,
-      returnDate,
-    ),
+    bookingUrl: null, // derived fresh by flight.service.ts — never cached in DB
     rawData: {
       bookingToken: result.booking_token ?? null,
       departureToken: result.departure_token ?? null,
@@ -146,7 +129,6 @@ async function fetchOneWay(
   date: string,
   passengers: number,
   cabinClass: CabinClass,
-  returnDateForUrl?: string,
 ): Promise<ScrapedFlight[]> {
   const searchParams: Record<string, string> = {
     engine: 'google_flights',
@@ -191,7 +173,7 @@ async function fetchOneWay(
         logger.warn(`Skipping flight with invalid price: ${result.flights?.[0]?.flight_number}`);
         continue;
       }
-      flights.push(normalizeFlight(result, passengers, cabinClass, date, returnDateForUrl));
+      flights.push(normalizeFlight(result, passengers, cabinClass, date));
     }
   };
 
@@ -227,7 +209,7 @@ export const googleFlightsScraper: IScraper = {
     // selected outbound — not useful for our comparison engine.
     const outboundFlights = await fetchOneWay(
       originAirport, destinationAirport, outboundDate,
-      passengers, cabinClass, returnDateStr,
+      passengers, cabinClass,
     );
 
     if (!returnDateStr) {
