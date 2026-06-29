@@ -32,6 +32,37 @@ export function ComparisonView({
   const destination =
     oneWayOutboundFlights[0]?.arrivalAirport ?? roundTripFlights[0]?.arrivalAirport ?? '';
 
+  if (comparison.roundTripTotalPrice === null) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-gray-900">One-Way Pricing</h2>
+        </div>
+
+        {origin && destination && (
+          <AIInsightCard comparison={comparison} origin={origin} destination={destination} />
+        )}
+
+        <div className="card text-sm text-gray-600">
+          No return flights were found for this route, so a round-trip comparison isn't available.
+        </div>
+
+        <div className="card text-center">
+          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            Best One-Way Price
+          </div>
+          <PriceTag amount={Number(comparison.oneWayTotalPrice)} size="lg" />
+        </div>
+
+        <div className="space-y-2">
+          {oneWayOutboundFlights.map((f) => (
+            <FlightCard key={f.id} flight={f} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}

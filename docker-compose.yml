@@ -53,7 +53,7 @@ services:
       DATABASE_URL: postgresql://flightselect:${DB_PASSWORD:-flightselect_password}@postgres:5432/flightselect_db
       REDIS_URL: redis://redis:6379
       RAG_URL: http://rag:8000
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
       NODE_ENV: production
     ports:
       - '3001:3001'

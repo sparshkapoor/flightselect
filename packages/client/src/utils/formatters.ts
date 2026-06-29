@@ -1,5 +1,3 @@
-import { format } from 'date-fns';
-
 export function formatPrice(amount: number, currency = 'USD'): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -17,8 +15,19 @@ export function formatDurationMinutes(minutes: number): string {
   return `${hours}h ${mins}m`;
 }
 
+// Flight times are wall-clock time at the departure/arrival airport, stored
+// as a naive timestamp with no real timezone conversion applied anywhere in
+// the pipeline (scraper -> DB -> API all pass the digits through as-is, just
+// labeled UTC in transit). Formatting with the viewer's local timezone would
+// re-interpret those digits and show the wrong clock time — read the UTC
+// fields directly instead, which yields the original, correct digits.
 export function formatTime(dateStr: string): string {
-  return format(new Date(dateStr), 'h:mm a');
+  const d = new Date(dateStr);
+  const hours = d.getUTCHours();
+  const minutes = d.getUTCMinutes();
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const displayHours = hours % 12 === 0 ? 12 : hours % 12;
+  return `${displayHours}:${String(minutes).padStart(2, '0')} ${period}`;
 }
 
 export function formatPriceDifference(diff: number): string {

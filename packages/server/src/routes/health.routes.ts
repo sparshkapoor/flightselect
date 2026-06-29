@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { prisma } from '../config/database';
+import { pool } from '../config/database';
 import { redis } from '../config/redis';
 
 const router = Router();
@@ -12,7 +12,7 @@ router.get('/', async (_req, res) => {
   };
 
   try {
-    await prisma.$queryRaw`SELECT 1`;
+    await pool.query('SELECT 1');
     checks.database = 'ok';
   } catch {
     checks.database = 'error';

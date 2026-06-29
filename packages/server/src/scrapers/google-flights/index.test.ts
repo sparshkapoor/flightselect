@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { normalizeFlight, buildGoogleFlightsUrl } from './index';
-import { buildGoogleFlightsTfsUrl, deriveBookingUrl } from '../../utils/googleFlightsUrl';
+import { buildGoogleFlightsTfsUrl, deriveBookingUrl, parseSegmentsFromBookingToken, buildGoogleFlightsTfsUrlFromSegments } from '../../utils/googleFlightsUrl';
 import { CabinClass } from '@flightselect/shared';
 
 const seg = (departure: string, arrival: string, durationMinutes: number, airline = 'Delta', flightNumber = 'DL100') => ({
@@ -129,6 +129,57 @@ describe('deriveBookingUrl', () => {
     expect(url).toContain('?q=Flights+from+EWR+to+SFO');
     expect(url).not.toContain('tfs=');
     expect(url).not.toContain('return');
+  });
+
+  it('falls back to search URL for a connecting flight with no usable booking token', () => {
+    // No rawData/bookingToken supplied — only the single stored segment's
+    // flight number, which can't represent a whole connecting itinerary.
+    const url = deriveBookingUrl('UA 546', 'EWR', 'LAS', new Date('2026-07-03T16:19:00'), true);
+    expect(url).toContain('?q=Flights+from+EWR+to+LAS');
+    expect(url).not.toContain('tfs=');
+  });
+
+  it('builds an accurate multi-segment tfs for a connecting flight when rawData.bookingToken is present', () => {
+    // Real SerpAPI bookingToken for EWR->PDX (AS1630) -> LAS (AS757).
+    const rawData = {
+      bookingToken:
+        'WyJDalJJTldONlYwVktkMHA2WW1OQlUzbHJTVUZDUnkwdExTMHRMUzB0TFhaM2EzRXhNa0ZCUVVGQlIzQkNOVmhqUTNnNExXbEJFZ3hCVXpFMk16QjhRVk0zTlRjYUN3anMvZ0VRQWhvRFZWTkVPQnh3N1A0QiIsW1siRVdSIiwiMjAyNi0wNy0wNCIsIlBEWCIsbnVsbCwiQVMiLCIxNjMwIl0sWyJQRFgiLCIyMDI2LTA3LTA0IiwiTEFTIixudWxsLCJBUyIsIjc1NyJdXV0=',
+    };
+    const url = deriveBookingUrl('AS 1630', 'EWR', 'LAS', new Date('2026-07-04T06:30:00'), true, rawData);
+    expect(url).toContain('/search?tfs=');
+
+    const tfs = new URL(url).searchParams.get('tfs')!;
+    const decoded = Buffer.from(tfs, 'base64url').toString('binary');
+    expect(decoded).toContain('EWR');
+    expect(decoded).toContain('PDX');
+    expect(decoded).toContain('LAS');
+    expect(decoded).toContain('1630');
+    expect(decoded).toContain('757');
+  });
+});
+
+describe('buildGoogleFlightsTfsUrlFromSegments', () => {
+  it('matches Google\'s own tfs bytes for a real connecting itinerary, byte-for-byte', () => {
+    // Ground truth: real SerpAPI bookingToken for this flight (EWR->PDX->LAS,
+    // AS1630/AS757), and a tfs Google itself issued (via the real Google
+    // Flights UI, captured by the user) for the same itinerary.
+    const segments = parseSegmentsFromBookingToken(
+      'WyJDalJJTldONlYwVktkMHA2WW1OQlUzbHJTVUZDUnkwdExTMHRMUzB0TFhaM2EzRXhNa0ZCUVVGQlIzQkNOVmhqUTNnNExXbEJFZ3hCVXpFMk16QjhRVk0zTlRjYUN3anMvZ0VRQWhvRFZWTkVPQnh3N1A0QiIsW1siRVdSIiwiMjAyNi0wNy0wNCIsIlBEWCIsbnVsbCwiQVMiLCIxNjMwIl0sWyJQRFgiLCIyMDI2LTA3LTA0IiwiTEFTIixudWxsLCJBUyIsIjc1NyJdXV0='
+    )!;
+    const url = buildGoogleFlightsTfsUrlFromSegments(segments, 'EWR', 'LAS');
+    const tfs = new URL(url).searchParams.get('tfs')!;
+
+    // The leg bytes Google's real round-trip booking tfs used for this exact
+    // outbound itinerary (extracted from a captured google.com/travel/flights
+    // booking URL — see HANDOFF_NEXT_SESSION.md).
+    const googleLegHex =
+      '120a323032362d30372d303422200a03455752120a323032362d30372d30341a035044582a024153320431363330221f0a03504458120a323032362d30372d30341a034c41532a0241533203373537320241536a07080112034557527207080112034c4153';
+
+    const decoded = Buffer.from(tfs, 'base64url');
+    // Our tfs wraps the same leg bytes in the top-level message (field 1/2 header
+    // then field 3 = leg, then trailing fields) — assert the leg bytes appear
+    // verbatim, proving the segment encoding itself is byte-identical to Google's.
+    expect(decoded.toString('hex')).toContain(googleLegHex);
   });
 });
 

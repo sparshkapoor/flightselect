@@ -1,0 +1,95 @@
+-- Idempotent schema — safe to run on every startup
+DO $$ BEGIN CREATE TYPE "CabinClass" AS ENUM ('ECONOMY', 'PREMIUM_ECONOMY', 'BUSINESS', 'FIRST');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN CREATE TYPE "TripType" AS ENUM ('ONE_WAY', 'ROUND_TRIP');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN CREATE TYPE "RecommendedOption" AS ENUM ('ROUND_TRIP', 'ONE_WAY', 'MIXED');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN CREATE TYPE "SearchStatus" AS ENUM ('PENDING', 'COMPLETED', 'FAILED');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS "User" (
+    "id"                TEXT        NOT NULL PRIMARY KEY,
+    "email"             TEXT        NOT NULL UNIQUE,
+    "displayName"       TEXT,
+    "preferredCurrency" TEXT        NOT NULL DEFAULT 'USD',
+    "homeAirport"       TEXT,
+    "createdAt"         TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS "SearchQuery" (
+    "id"                        TEXT           NOT NULL PRIMARY KEY,
+    "originAirport"             TEXT           NOT NULL,
+    "destinationAirport"        TEXT           NOT NULL,
+    "departureDate"             TIMESTAMP(3)   NOT NULL,
+    "returnDate"                TIMESTAMP(3),
+    "tripType"                  "TripType"     NOT NULL,
+    "passengers"                INTEGER        NOT NULL DEFAULT 1,
+    "cabinClass"                "CabinClass"   NOT NULL DEFAULT 'ECONOMY',
+    "maxLayovers"               INTEGER,
+    "maxTotalDurationMinutes"   INTEGER,
+    "preferredLayoverAirports"  TEXT[],
+    "avoidedAirlines"           TEXT[],
+    "preferredAirlines"         TEXT[],
+    "flexibleDates"             BOOLEAN        NOT NULL DEFAULT false,
+    "flexibleDateRangeDays"     INTEGER,
+    "status"                    "SearchStatus" NOT NULL DEFAULT 'PENDING',
+    "createdAt"                 TIMESTAMP(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "userId"                    TEXT           REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS "Flight" (
+    "id"                    TEXT         NOT NULL PRIMARY KEY,
+    "airline"               TEXT         NOT NULL,
+    "flightNumber"          TEXT         NOT NULL,
+    "departureAirport"      TEXT         NOT NULL,
+    "arrivalAirport"        TEXT         NOT NULL,
+    "departureTime"         TIMESTAMP(3) NOT NULL,
+    "arrivalTime"           TIMESTAMP(3) NOT NULL,
+    "durationMinutes"       INTEGER      NOT NULL,
+    "price"                 DECIMAL(65,30) NOT NULL,
+    "currency"              TEXT         NOT NULL DEFAULT 'USD',
+    "cabinClass"            "CabinClass" NOT NULL,
+    "isLayover"             BOOLEAN      NOT NULL DEFAULT false,
+    "layoverAirport"        TEXT,
+    "layoverDurationMinutes" INTEGER,
+    "source"                TEXT         NOT NULL,
+    "scrapedAt"             TIMESTAMP(3) NOT NULL,
+    "bookingUrl"            TEXT,
+    "rawData"               JSONB,
+    "searchQueryId"         TEXT         NOT NULL REFERENCES "SearchQuery"("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS "Comparison" (
+    "id"                        TEXT              NOT NULL PRIMARY KEY,
+    "searchQueryId"             TEXT              NOT NULL REFERENCES "SearchQuery"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    "roundTripFlightIds"        TEXT[],
+    "oneWayOutboundFlightIds"   TEXT[],
+    "oneWayReturnFlightIds"     TEXT[],
+    "roundTripTotalPrice"       DECIMAL(65,30),
+    "oneWayTotalPrice"          DECIMAL(65,30)    NOT NULL,
+    "priceDifference"           DECIMAL(65,30),
+    "recommendedOption"         "RecommendedOption" NOT NULL,
+    "aiAnalysis"                TEXT,
+    "aiAnalysisGeneratedAt"     TIMESTAMP(3),
+    "createdAt"                 TIMESTAMP(3)      NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Round-trip pricing is not always derivable (e.g. no return flights for the route) — nullable
+-- so that case can be represented honestly instead of inventing a number. Idempotent for
+-- databases created before this column allowed NULL.
+ALTER TABLE "Comparison" ALTER COLUMN "roundTripTotalPrice" DROP NOT NULL;
+ALTER TABLE "Comparison" ALTER COLUMN "priceDifference" DROP NOT NULL;
+
+CREATE TABLE IF NOT EXISTS "SavedSearch" (
+    "id"                 TEXT           NOT NULL PRIMARY KEY,
+    "userId"             TEXT           NOT NULL REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    "searchQueryId"      TEXT           NOT NULL REFERENCES "SearchQuery"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    "nickname"           TEXT,
+    "priceAlertEnabled"  BOOLEAN        NOT NULL DEFAULT false,
+    "priceAlertThreshold" DECIMAL(65,30),
+    "createdAt"          TIMESTAMP(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

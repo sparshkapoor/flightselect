@@ -61,9 +61,9 @@ export interface Comparison {
   roundTripFlightIds: string[];
   oneWayOutboundFlightIds: string[];
   oneWayReturnFlightIds: string[];
-  roundTripTotalPrice: number;
+  roundTripTotalPrice: number | null;
   oneWayTotalPrice: number;
-  priceDifference: number;
+  priceDifference: number | null;
   recommendedOption: RecommendedOption;
   aiAnalysis: string | null;
   aiAnalysisGeneratedAt: string | null;
@@ -126,21 +126,6 @@ export interface ComparisonResponse {
   oneWayReturnFlights: Flight[];
 }
 
-export interface AIAnalysisRequest {
-  comparisonId: string;
-  searchQuery: SearchQuery;
-  comparison: Comparison;
-  flights: Flight[];
-}
-
-export interface AIAnalysisResponse {
-  summary: string;
-  recommendation: RecommendedOption;
-  confidenceScore: number;
-  reasoning: string[];
-  warnings: string[];
-  generatedAt: string;
-}
 
 export interface BookingOption {
   seller: string;

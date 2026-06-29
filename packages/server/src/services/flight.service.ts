@@ -10,6 +10,8 @@ function withBookingUrl(flight: DbFlight): DbFlight {
       flight.departureAirport,
       flight.arrivalAirport,
       new Date(flight.departureTime),
+      flight.isLayover,
+      flight.rawData,
     ),
   };
 }

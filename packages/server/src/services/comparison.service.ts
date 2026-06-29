@@ -1,24 +1,28 @@
-import { prisma } from '../config/database';
+import { query, queryOne } from '../config/database';
+import { DbComparison, DbFlight } from '../types/db';
 
 export class ComparisonService {
   async getComparison(id: string) {
-    const comparison = await prisma.comparison.findUnique({ where: { id } });
+    const comparison = await queryOne<DbComparison>(
+      'SELECT * FROM "Comparison" WHERE id = $1',
+      [id]
+    );
     if (!comparison) return null;
 
     const [roundTripFlights, oneWayOutboundFlights, oneWayReturnFlights] = await Promise.all([
-      prisma.flight.findMany({ where: { id: { in: comparison.roundTripFlightIds } } }),
-      prisma.flight.findMany({ where: { id: { in: comparison.oneWayOutboundFlightIds } } }),
-      prisma.flight.findMany({ where: { id: { in: comparison.oneWayReturnFlightIds } } }),
+      query<DbFlight>('SELECT * FROM "Flight" WHERE id = ANY($1)', [comparison.roundTripFlightIds]),
+      query<DbFlight>('SELECT * FROM "Flight" WHERE id = ANY($1)', [comparison.oneWayOutboundFlightIds]),
+      query<DbFlight>('SELECT * FROM "Flight" WHERE id = ANY($1)', [comparison.oneWayReturnFlightIds]),
     ]);
 
     return { comparison, roundTripFlights, oneWayOutboundFlights, oneWayReturnFlights };
   }
 
   async getComparisonsByQuery(searchQueryId: string) {
-    return prisma.comparison.findMany({
-      where: { searchQueryId },
-      orderBy: { createdAt: 'desc' },
-    });
+    return query<DbComparison>(
+      'SELECT * FROM "Comparison" WHERE "searchQueryId" = $1 ORDER BY "createdAt" DESC',
+      [searchQueryId]
+    );
   }
 }
 

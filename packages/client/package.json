@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "lsof -ti:5173,5174,5175 | xargs kill -9 2>/dev/null; true",
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",

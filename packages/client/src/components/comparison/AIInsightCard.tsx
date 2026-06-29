@@ -15,17 +15,19 @@ export function AIInsightCard({ comparison, origin, destination }: AIInsightCard
   const [insight, setInsight] = useState('');
 
   useEffect(() => {
-    const cheaper = Math.min(
-      Number(comparison.roundTripTotalPrice),
-      Number(comparison.oneWayTotalPrice)
-    );
-    const question =
-      `${origin} to ${destination}: same-airline $${Number(comparison.roundTripTotalPrice).toFixed(0)}, ` +
-      `mix-and-match $${Number(comparison.oneWayTotalPrice).toFixed(0)}. ` +
-      `Is $${cheaper.toFixed(0)} a good price for this route?`;
+    const hasRoundTrip = comparison.roundTripTotalPrice !== null;
+    const cheaper = hasRoundTrip
+      ? Math.min(Number(comparison.roundTripTotalPrice), Number(comparison.oneWayTotalPrice))
+      : Number(comparison.oneWayTotalPrice);
+    const question = hasRoundTrip
+      ? `${origin} to ${destination}: same-airline $${Number(comparison.roundTripTotalPrice).toFixed(0)}, ` +
+        `mix-and-match $${Number(comparison.oneWayTotalPrice).toFixed(0)}. ` +
+        `Is $${cheaper.toFixed(0)} a good price for this route?`
+      : `${origin} to ${destination}: $${cheaper.toFixed(0)} one-way, no return flights found. ` +
+        `Is $${cheaper.toFixed(0)} a good price for this route?`;
 
     const attempt = (retriesLeft: number) => {
-      queryRag(question, 'comparison').then((answer) => {
+      queryRag(question, 'comparison', origin, destination).then((answer) => {
         if (answer) {
           setInsight(answer);
           setState('ready');

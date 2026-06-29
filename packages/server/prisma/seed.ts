@@ -1,11 +1,9 @@
 import { PrismaClient } from '@prisma/client';
 import { MockScraper } from '../src/scrapers/mock.scraper';
-import { MockAIService } from '../src/services/ai/ai.service';
 import { CabinClass, TripType, RecommendedOption } from '@flightselect/shared';
 
 const prisma = new PrismaClient();
 const scraper = new MockScraper();
-const aiService = new MockAIService();
 
 async function main() {
   console.log('Seeding database...');
@@ -194,46 +192,34 @@ async function main() {
     const ret = sorted.filter((f) => f.departureAirport === config.destinationAirport);
 
     const bestOutbound = outbound[0] ?? sorted[0];
-    const bestReturn = ret[0] ?? sorted[1] ?? sorted[0];
+    // A "return" flight only exists for round-trip configs — never invent one
+    // by reusing an unrelated outbound flight.
+    const bestReturn = ret[0];
+    const isRoundTrip = Boolean(bestOutbound && bestReturn);
 
-    const roundTripTotalPrice = bestOutbound ? Number(bestOutbound.price) * 1.8 : 0;
-    const oneWayTotalPrice =
-      bestOutbound && bestReturn
-        ? Number(bestOutbound.price) + Number(bestReturn.price)
-        : 0;
-    const priceDifference = roundTripTotalPrice - oneWayTotalPrice;
-    const recommendedOption =
-      roundTripTotalPrice <= oneWayTotalPrice
-        ? RecommendedOption.ROUND_TRIP
-        : RecommendedOption.ONE_WAY;
-
-    const aiAnalysis = await aiService.analyzeComparison({
-      comparisonId: 'seed',
-      roundTripTotalPrice,
-      oneWayTotalPrice,
-      priceDifference,
-      roundTripFlightCount: outbound.length,
-      oneWayFlightCount: outbound.length + ret.length,
-      originAirport: config.originAirport,
-      destinationAirport: config.destinationAirport,
-      departureDate: config.departureDate.toISOString(),
-      returnDate: config.returnDate?.toISOString(),
-      cabinClass: config.cabinClass,
-      passengers: config.passengers,
-    });
+    // Both legs purchased together (mix-and-match baseline) when round-trip;
+    // a bare one-way fare when there's no return leg at all.
+    const oneWayTotalPrice = bestOutbound
+      ? Number(bestOutbound.price) + (isRoundTrip ? Number(bestReturn!.price) : 0)
+      : 0;
+    // This seed doesn't model a separate same-airline-vs-mix split — both
+    // columns show the same real total when round-trip data exists.
+    const roundTripTotalPrice = isRoundTrip ? oneWayTotalPrice : null;
+    const priceDifference = roundTripTotalPrice !== null ? roundTripTotalPrice - oneWayTotalPrice : null;
+    const recommendedOption = isRoundTrip ? RecommendedOption.ROUND_TRIP : RecommendedOption.ONE_WAY;
 
     await prisma.comparison.create({
       data: {
         searchQueryId: searchQuery.id,
-        roundTripFlightIds: outbound.slice(0, 3).map((f) => f.id),
+        roundTripFlightIds: isRoundTrip ? [bestOutbound!.id, bestReturn!.id] : [],
         oneWayOutboundFlightIds: bestOutbound ? [bestOutbound.id] : [],
         oneWayReturnFlightIds: bestReturn ? [bestReturn.id] : [],
         roundTripTotalPrice,
         oneWayTotalPrice,
         priceDifference,
         recommendedOption,
-        aiAnalysis: JSON.stringify(aiAnalysis),
-        aiAnalysisGeneratedAt: new Date(aiAnalysis.generatedAt),
+        aiAnalysis: null,
+        aiAnalysisGeneratedAt: null,
       },
     });
 

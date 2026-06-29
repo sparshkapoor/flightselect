@@ -12,6 +12,7 @@ const envSchema = z.object({
   SERPAPI_API_KEY: z.string().optional(),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
   RAG_INTERNAL_SECRET: z.string().optional(),
+  RAG_URL: z.string().url().default('http://localhost:8000'),
 });
 
 const parseResult = envSchema.safeParse(process.env);

@@ -1,0 +1,121 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { DbSearchQuery, DbFlight } from '../types/db';
+
+const queryMock = vi.fn();
+const queryOneMock = vi.fn();
+
+vi.mock('../config/database', () => ({
+  query: (...args: unknown[]) => queryMock(...args),
+  queryOne: (...args: unknown[]) => queryOneMock(...args),
+}));
+
+import { processComparisonJob } from './comparison.job';
+
+function makeSearchQuery(overrides: Partial<DbSearchQuery> = {}): DbSearchQuery {
+  return {
+    id: 'sq1',
+    originAirport: 'EWR',
+    destinationAirport: 'SFO',
+    departureDate: new Date('2026-07-01'),
+    returnDate: null,
+    tripType: 'ONE_WAY',
+    passengers: 1,
+    cabinClass: 'ECONOMY',
+    maxLayovers: null,
+    maxTotalDurationMinutes: null,
+    preferredLayoverAirports: [],
+    avoidedAirlines: [],
+    preferredAirlines: [],
+    flexibleDates: false,
+    flexibleDateRangeDays: null,
+    status: 'COMPLETED',
+    createdAt: new Date('2026-06-26'),
+    userId: null,
+    ...overrides,
+  };
+}
+
+function makeFlight(overrides: Partial<DbFlight> & { id: string; price: string }): DbFlight {
+  return {
+    airline: 'Delta',
+    flightNumber: 'DL100',
+    departureAirport: 'EWR',
+    arrivalAirport: 'SFO',
+    departureTime: new Date('2026-07-01T08:00:00Z'),
+    arrivalTime: new Date('2026-07-01T11:00:00Z'),
+    durationMinutes: 360,
+    currency: 'USD',
+    cabinClass: 'ECONOMY',
+    isLayover: false,
+    layoverAirport: null,
+    layoverDurationMinutes: null,
+    source: 'serpapi',
+    scrapedAt: new Date('2026-06-26'),
+    bookingUrl: null,
+    rawData: null,
+    searchQueryId: 'sq1',
+    ...overrides,
+  };
+}
+
+function getInsertedComparisonParams(): unknown[] {
+  const insertCall = queryMock.mock.calls.find(([sql]) =>
+    String(sql).includes('INSERT INTO "Comparison"')
+  );
+  if (!insertCall) throw new Error('No INSERT INTO "Comparison" call was made');
+  return insertCall[1] as unknown[];
+}
+
+describe('processComparisonJob', () => {
+  beforeEach(() => {
+    queryMock.mockReset();
+    queryOneMock.mockReset();
+  });
+
+  it('stores a null round-trip price instead of a fabricated one when there are no return flights', async () => {
+    queryOneMock.mockResolvedValue(makeSearchQuery());
+    queryMock.mockImplementation((sql: string) => {
+      if (String(sql).startsWith('SELECT * FROM "Flight"')) {
+        return Promise.resolve([
+          makeFlight({ id: 'out-1', price: '200.00' }),
+          makeFlight({ id: 'out-2', price: '250.00' }),
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    await processComparisonJob({ searchQueryId: 'sq1' });
+
+    const [, , roundTripFlightIds, oneWayOutboundFlightIds, oneWayReturnFlightIds,
+      roundTripTotalPrice, oneWayTotalPrice, priceDifference, recommendedOption] =
+      getInsertedComparisonParams();
+
+    expect(roundTripTotalPrice).toBeNull();
+    expect(priceDifference).toBeNull();
+    expect(oneWayTotalPrice).toBe(200); // cheapest real outbound price, not inflated
+    expect(recommendedOption).toBe('ONE_WAY');
+    expect(roundTripFlightIds).toEqual([]);
+    expect(oneWayOutboundFlightIds).toEqual(['out-1']);
+    expect(oneWayReturnFlightIds).toEqual([]);
+  });
+
+  it('stores a real computed round-trip price when return flights exist', async () => {
+    queryOneMock.mockResolvedValue(makeSearchQuery({ tripType: 'ROUND_TRIP', returnDate: new Date('2026-07-08') }));
+    queryMock.mockImplementation((sql: string) => {
+      if (String(sql).startsWith('SELECT * FROM "Flight"')) {
+        return Promise.resolve([
+          makeFlight({ id: 'out-1', price: '200.00', airline: 'Delta' }),
+          makeFlight({ id: 'ret-1', price: '180.00', airline: 'Delta', departureAirport: 'SFO', arrivalAirport: 'EWR' }),
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    await processComparisonJob({ searchQueryId: 'sq1' });
+
+    const [, , , , , roundTripTotalPrice, , priceDifference] = getInsertedComparisonParams();
+
+    expect(roundTripTotalPrice).toBe(380); // real same-airline combo, not a multiplier
+    expect(priceDifference).not.toBeNull();
+  });
+});

@@ -109,7 +109,7 @@ export function FlightCard({ flight, selected, onSelect }: FlightCardProps) {
       {/* Price + actions */}
       <div className="text-right shrink-0 flex flex-col items-end gap-0.5">
         <PriceTag amount={Number(flight.price)} currency={flight.currency} />
-        <div className="text-xs text-gray-400">{CABIN_CLASS_LABELS[flight.cabinClass]}</div>
+        <div className="text-xs text-gray-400">{CABIN_CLASS_LABELS[flight.cabinClass]} · one-way</div>
         <button
           onClick={handleBookingClick}
           className="mt-1.5 text-xs text-brand-600 hover:text-brand-800 font-semibold hover:underline"

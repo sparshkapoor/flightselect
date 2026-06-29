@@ -15,7 +15,11 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
+const corsOrigin = env.NODE_ENV === 'production'
+  ? env.CORS_ORIGIN
+  : /^http:\/\/localhost:\d+$/;
+
+app.use(cors({ origin: corsOrigin, credentials: true }));
 
 app.use('/api', apiRateLimit, routes);
 

@@ -60,3 +60,6 @@ data/
 
 # Generated artifacts
 repomix-output.xml
+
+# Editor tooling output
+.VSCodeCounter/

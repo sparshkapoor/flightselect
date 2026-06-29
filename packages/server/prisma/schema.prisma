@@ -2,7 +2,8 @@
 // Learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
 }
 
 datasource db {
@@ -100,9 +101,9 @@ model Comparison {
   roundTripFlightIds    String[]
   oneWayOutboundFlightIds String[]
   oneWayReturnFlightIds String[]
-  roundTripTotalPrice   Decimal
+  roundTripTotalPrice   Decimal?
   oneWayTotalPrice      Decimal
-  priceDifference       Decimal
+  priceDifference       Decimal?
   recommendedOption     RecommendedOption
   aiAnalysis            String?
   aiAnalysisGeneratedAt DateTime?

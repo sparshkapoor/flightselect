@@ -37,20 +37,29 @@ _COMPARISON_PROMPT = (
 )
 
 
-def query(question: str, n_results: int = 5, mode: str = "general") -> str:
+def query(
+    question: str,
+    n_results: int = 5,
+    mode: str = "general",
+    where: dict | None = None,
+) -> str:
     """
     Retrieve relevant flights and generate a grounded answer.
 
     mode: "general" for CLI use, "comparison" for the UI card (tighter output).
+    where: optional Chroma metadata filter (e.g. scope retrieval to one route)
+           so an answer is never grounded in an unrelated search's flights.
     """
     if not question.strip():
         return "Please provide a non-empty question."
 
     [question_embedding] = embed([question])
-    context_docs = retrieve(question_embedding, n_results=n_results)
+    context_docs = retrieve(question_embedding, n_results=n_results, where=where)
 
     if not context_docs:
-        return "No relevant flight data found for that query."
+        # Same sentinel the LLM uses when context is thin — the caller (and the
+        # client) already treats this as "not ready," not as a real answer.
+        return "insufficient data"
 
     context = "\n".join(f"- {doc}" for doc in context_docs)
     user_content = f"Flight records:\n{context}\n\nQuestion: {question}"

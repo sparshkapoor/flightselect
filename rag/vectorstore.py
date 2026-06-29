@@ -32,11 +32,15 @@ def ingest(
     logger.info("Wrote %d documents to collection '%s'", len(documents), config.COLLECTION_NAME)
 
 
-def retrieve(query_embedding: list[float], n_results: int | None = None) -> list[str]:
-    """Return the top-n most similar document strings."""
+def retrieve(
+    query_embedding: list[float],
+    n_results: int | None = None,
+    where: dict | None = None,
+) -> list[str]:
+    """Return the top-n most similar document strings, optionally scoped by metadata filter."""
     n = n_results if n_results is not None else config.RETRIEVE_N
     col = _collection()
-    results = col.query(query_embeddings=[query_embedding], n_results=n)
+    results = col.query(query_embeddings=[query_embedding], n_results=n, where=where)
     docs: list[str] = (results.get("documents") or [[]])[0]
-    logger.info("Retrieved %d documents", len(docs))
+    logger.info("Retrieved %d documents (where=%s)", len(docs), where)
     return docs

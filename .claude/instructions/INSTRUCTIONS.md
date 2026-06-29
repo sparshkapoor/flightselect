@@ -35,8 +35,7 @@ Use the existing format in CHANGELOG.md:
 ```bash
 npm run docker:up     # Start Postgres (port 5433), Redis (port 6379), pgAdmin (port 5050)
 npm run build         # Build shared package first
-npm run db:migrate    # Run Prisma migrations
-npm run db:seed       # Seed with mock data
+npm run db:migrate    # Apply schema.sql (idempotent, safe to re-run)
 npm run dev           # Start both client (5173) and server (3001)
 ```
 
@@ -48,7 +47,11 @@ npm run dev           # Start both client (5173) and server (3001)
 - The `@flightselect/shared` package must be built (`npm run build`) before the server can use its types
 - `dotenv` must be imported as the first line in `packages/server/src/index.ts` — moving it will break env loading
 - The BullMQ search worker is started in `index.ts bootstrap()` — without it, search jobs queue but never process
-- `CabinClass` and `TripType` enums exist in both `@prisma/client` and `@flightselect/shared` — always prefer the shared versions when passing to scraper interfaces
+- No ORM — all DB access is raw SQL via `pg` (Pool + typed `query<T>` / `queryOne<T>` helpers in `src/config/database.ts`)
+- Schema is in `packages/server/schema.sql` — idempotent (IF NOT EXISTS), runs at container startup via `node dist/config/migrate.js`
+- pg returns DECIMAL columns as strings — always wrap price fields in `Number()` before arithmetic
+- Column names in the DB are camelCase (Prisma legacy) — SQL must quote them: `"searchQueryId"`, `"departureAirport"`, etc.
+- IDs are generated with `crypto.randomUUID()` in application code (Node 20 built-in)
 
 ### User preferences
 - **LLM**: Prefers open-source/free (Ollama). No paid API keys unless necessary.

@@ -1,7 +1,7 @@
 import { logger } from '../utils/logger';
 import { env } from '../config/env';
 
-const RAG_BASE_URL = process.env.RAG_URL ?? 'http://localhost:8000';
+const RAG_BASE_URL = env.RAG_URL;
 
 interface RagAnswer {
   answer: string;
@@ -10,7 +10,9 @@ interface RagAnswer {
 export async function queryRag(
   question: string,
   nResults = 5,
-  mode: 'general' | 'comparison' = 'general'
+  mode: 'general' | 'comparison' = 'general',
+  origin?: string,
+  destination?: string
 ): Promise<string | null> {
   try {
     const res = await fetch(`${RAG_BASE_URL}/query`, {
@@ -19,7 +21,7 @@ export async function queryRag(
         'Content-Type': 'application/json',
         ...(env.RAG_INTERNAL_SECRET ? { 'X-RAG-Secret': env.RAG_INTERNAL_SECRET } : {}),
       },
-      body: JSON.stringify({ question, n_results: nResults, mode }),
+      body: JSON.stringify({ question, n_results: nResults, mode, origin, destination }),
       signal: AbortSignal.timeout(120_000),
     });
 

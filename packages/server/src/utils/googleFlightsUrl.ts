@@ -60,16 +60,107 @@ export function buildGoogleFlightsSearchUrl(
   return `https://www.google.com/travel/flights?q=Flights+from+${origin}+to+${destination}+on+${departureDate}`;
 }
 
+export interface FlightSegment {
+  origin: string;
+  date: string; // YYYY-MM-DD
+  dest: string;
+  airline: string;
+  flightNum: string;
+}
+
+// Builds one "leg" (one direction of travel) from its real segments. Verified
+// byte-for-byte against a tfs Google itself issued for a real connecting
+// itinerary (EWR->PDX->LAS, AS1630+AS757) — this is the actual format, not a
+// guess: a leg has one repeated `segment` entry (field 4) per flight, a
+// leg-level overall-airline marker, then overall departure/arrival nodes.
+function buildLegBytes(segments: FlightSegment[], overallOrigin: string, overallDest: string): number[] {
+  const inner: number[] = [...pbString(2, segments[0].date)];
+  for (const seg of segments) {
+    const segBytes = [
+      ...pbString(1, seg.origin),
+      ...pbString(2, seg.date),
+      ...pbString(3, seg.dest),
+      ...pbString(5, seg.airline),
+      ...pbString(6, seg.flightNum),
+    ];
+    inner.push(...pbBytes(4, segBytes));
+  }
+  inner.push(...pbString(6, segments[0].airline));
+  const depNode = [...pbVarint(1, 1), ...pbString(2, overallOrigin)];
+  const arrNode = [...pbVarint(1, 1), ...pbString(2, overallDest)];
+  inner.push(...pbBytes(13, depNode), ...pbBytes(14, arrNode));
+  return inner;
+}
+
+// One-way deep-link built from the flight's real segment list (works for
+// direct flights — one segment — and connecting flights — multiple segments
+// — uniformly, since this is the same leg structure Google itself uses).
+export function buildGoogleFlightsTfsUrlFromSegments(
+  segments: FlightSegment[],
+  overallOrigin: string,
+  overallDest: string,
+): string {
+  const leg = buildLegBytes(segments, overallOrigin, overallDest);
+  const tfs: number[] = [
+    ...pbVarint(1, 28),
+    ...pbVarint(2, 2), // one-way
+    ...pbBytes(3, leg),
+    ...pbVarint(8, 1),
+    ...pbVarint(9, 1),
+    ...pbVarint(14, 1),
+    ...pbVarint(19, 1),
+  ];
+  const b64 = Buffer.from(tfs).toString('base64url');
+  return `https://www.google.com/travel/flights/search?tfs=${b64}&tfu=EgIIAQ&hl=en&gl=us&curr=USD`;
+}
+
+// SerpAPI's `booking_token` is base64 JSON: [opaqueGoogleToken, [[origin, date,
+// dest, layoverAirport, airline, flightNum], ...]] — one entry per real
+// segment, already exactly what we need to build an accurate multi-segment
+// leg. This is already stored in Flight.rawData.bookingToken for every flight.
+export function parseSegmentsFromBookingToken(bookingToken: string): FlightSegment[] | null {
+  try {
+    const decoded = JSON.parse(Buffer.from(bookingToken, 'base64').toString('utf8'));
+    const segmentsRaw = decoded?.[1];
+    if (!Array.isArray(segmentsRaw) || segmentsRaw.length === 0) return null;
+    return segmentsRaw.map(([origin, date, dest, , airline, flightNum]: string[]) => ({
+      origin,
+      date,
+      dest,
+      airline,
+      flightNum,
+    }));
+  } catch {
+    return null;
+  }
+}
+
 // Derives a booking URL from the flight's stored data. Never stale — always
-// computed fresh from the immutable flight identifiers (route + date + flight number).
+// computed fresh from the immutable flight identifiers.
+//
+// Prefers the real segment list from rawData.bookingToken (accurate for both
+// direct and connecting flights — see buildGoogleFlightsTfsUrlFromSegments).
+// Falls back to the single-flight-number tfs (direct flights only — encoding
+// a connecting flight's single stored segment as the whole trip describes a
+// flight that doesn't exist and Google Flights rejects it), then to a generic
+// search URL if neither produces a usable link.
 export function deriveBookingUrl(
   flightNumber: string,
   departureAirport: string,
   arrivalAirport: string,
   departureTime: Date,
+  isLayover = false,
+  rawData?: Record<string, unknown> | null,
 ): string {
   const departureDate = departureTime.toISOString().slice(0, 10);
-  const match = flightNumber.match(/^([A-Z0-9]{2})\s*(\d+)$/);
+
+  const bookingToken = typeof rawData?.bookingToken === 'string' ? rawData.bookingToken : null;
+  const segments = bookingToken ? parseSegmentsFromBookingToken(bookingToken) : null;
+  if (segments) {
+    return buildGoogleFlightsTfsUrlFromSegments(segments, departureAirport, arrivalAirport);
+  }
+
+  const match = !isLayover && flightNumber.match(/^([A-Z0-9]{2})\s*(\d+)$/);
   if (match) {
     return buildGoogleFlightsTfsUrl(departureAirport, arrivalAirport, departureDate, match[1], match[2]);
   }

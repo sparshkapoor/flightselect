@@ -22,8 +22,8 @@ FlightSelect answers one question: *should you book a round-trip ticket, or woul
 │                              │  └──────────┘         │         │   │
 │                              │                        ▼         │   │
 │                              │  ┌──────────┐  ┌─────────────┐  │   │
-│                              │  │  Prisma  │  │   Redis 7   │  │   │
-│                              │  │  (ORM)   │  └─────────────┘  │   │
+│                              │  │   pg     │  │   Redis 7   │  │   │
+│                              │  │ (raw SQL)│  └─────────────┘  │   │
 │                              │  └────┬─────┘                   │   │
 │                              │       ▼                         │   │
 │                              │  ┌──────────┐                   │   │
@@ -48,8 +48,7 @@ FlightSelect answers one question: *should you book a round-trip ticket, or woul
 | Frontend | React 18, TypeScript, Vite, TailwindCSS |
 | State | Zustand (client), TanStack Query (server state) |
 | Backend | Node.js, Express, TypeScript |
-| ORM | Prisma |
-| Database | PostgreSQL 15 |
+| Database | PostgreSQL 15 (raw SQL via `pg`) |
 | Cache / Queue | Redis 7, BullMQ |
 | Validation | Zod (shared client + server) |
 | Logging | Pino |
