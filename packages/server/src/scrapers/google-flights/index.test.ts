@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { normalizeFlight, buildGoogleFlightsUrl } from './index';
-import { buildGoogleFlightsTfsUrl, deriveBookingUrl, parseSegmentsFromBookingToken, buildGoogleFlightsTfsUrlFromSegments } from '../../utils/googleFlightsUrl';
+import {
+  buildGoogleFlightsTfsUrl,
+  deriveBookingUrl,
+  parseSegmentsFromBookingToken,
+  buildGoogleFlightsTfsUrlFromSegments,
+  buildGoogleFlightsRoundTripTfsUrl,
+  deriveRoundTripBookingUrl,
+  FlightSegment,
+} from '../../utils/googleFlightsUrl';
 import { CabinClass } from '@flightselect/shared';
 
 const seg = (departure: string, arrival: string, durationMinutes: number, airline = 'Delta', flightNumber = 'DL100') => ({
@@ -180,6 +188,53 @@ describe('buildGoogleFlightsTfsUrlFromSegments', () => {
     // then field 3 = leg, then trailing fields) — assert the leg bytes appear
     // verbatim, proving the segment encoding itself is byte-identical to Google's.
     expect(decoded.toString('hex')).toContain(googleLegHex);
+  });
+});
+
+describe('buildGoogleFlightsRoundTripTfsUrl', () => {
+  it('combines both legs under a round-trip marker, reusing the same byte-verified leg encoding as the one-way builder', () => {
+    // Reuse the exact same outbound segments + leg bytes already verified
+    // byte-for-byte against a real Google-issued tfs above.
+    const outboundSegments = parseSegmentsFromBookingToken(
+      'WyJDalJJTldONlYwVktkMHA2WW1OQlUzbHJTVUZDUnkwdExTMHRMUzB0TFhaM2EzRXhNa0ZCUVVGQlIzQkNOVmhqUTNnNExXbEJFZ3hCVXpFMk16QjhRVk0zTlRjYUN3anMvZ0VRQWhvRFZWTkVPQnh3N1A0QiIsW1siRVdSIiwiMjAyNi0wNy0wNCIsIlBEWCIsbnVsbCwiQVMiLCIxNjMwIl0sWyJQRFgiLCIyMDI2LTA3LTA0IiwiTEFTIixudWxsLCJBUyIsIjc1NyJdXV0='
+    )!;
+    const returnSegments: FlightSegment[] = [
+      { origin: 'LAS', date: '2026-07-11', dest: 'EWR', airline: 'AS', flightNum: '999' },
+    ];
+
+    const googleLegHex =
+      '120a323032362d30372d303422200a03455752120a323032362d30372d30341a035044582a024153320431363330221f0a03504458120a323032362d30372d30341a034c41532a0241533203373537320241536a07080112034557527207080112034c4153';
+
+    const url = buildGoogleFlightsRoundTripTfsUrl(
+      outboundSegments, 'EWR', 'LAS',
+      returnSegments, 'LAS', 'EWR',
+    );
+    expect(url).toContain('/search?tfs=');
+
+    const tfs = new URL(url).searchParams.get('tfs')!;
+    const decoded = Buffer.from(tfs, 'base64url');
+    const hex = decoded.toString('hex');
+    const binary = decoded.toString('binary');
+
+    // field 1 = 28 (081c) immediately followed by field 2 = 1 / round trip
+    // (1001) — not field 2 = 2 / one-way (1002), proving this didn't silently
+    // fall back to the one-way encoding.
+    expect(hex).toContain('081c1001');
+    expect(hex).not.toContain('081c1002');
+
+    // Outbound leg bytes appear verbatim (same real Google-verified leg as above).
+    expect(hex).toContain(googleLegHex);
+
+    // Return leg's identifying data is present as its own segment.
+    expect(binary).toContain('LAS');
+    expect(binary).toContain('EWR');
+    expect(binary).toContain('999');
+  });
+
+  it('returns null from deriveRoundTripBookingUrl when either leg lacks a parseable bookingToken', () => {
+    const outbound = { departureAirport: 'EWR', arrivalAirport: 'LAS', rawData: { bookingToken: 'not-real-json' } };
+    const ret = { departureAirport: 'LAS', arrivalAirport: 'EWR', rawData: null };
+    expect(deriveRoundTripBookingUrl(outbound, ret)).toBeNull();
   });
 });
 

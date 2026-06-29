@@ -1,56 +1,37 @@
-import { useState } from 'react';
 import type { Flight, BookingOption } from '@flightselect/shared';
 import { PriceTag } from './PriceTag';
 import { FlightTimeline } from './FlightTimeline';
 import { CABIN_CLASS_LABELS } from '../../utils/constants';
+import { useBookingOptions } from '../../hooks/useBookingOptions';
+import { airlineInitials, airlineColor } from '../../utils/airlineBadge';
 
 interface FlightCardProps {
   flight: Flight;
   selected?: boolean;
   onSelect?: (flight: Flight) => void;
+  /** 'lazy' (default): click-to-fetch sellers, Google Flights link leads.
+   *  'eager': sellers are supplied by the parent (already batch-fetched) and lead;
+   *  Google Flights demoted to a fallback. */
+  mode?: 'lazy' | 'eager';
+  /** Required when mode === 'eager' — fetched once for the whole view by the parent. */
+  eagerOptions?: BookingOption[] | null;
+  eagerLoading?: boolean;
 }
 
-const FIRST_LETTER_COLORS: Record<string, string> = {
-  A: 'bg-blue-100 text-blue-700',
-  B: 'bg-indigo-100 text-indigo-700',
-  C: 'bg-cyan-100 text-cyan-700',
-  D: 'bg-sky-100 text-sky-700',
-  E: 'bg-green-100 text-green-700',
-  F: 'bg-teal-100 text-teal-700',
-  J: 'bg-amber-100 text-amber-700',
-  S: 'bg-rose-100 text-rose-700',
-  U: 'bg-purple-100 text-purple-700',
-};
-
-function airlineInitials(name: string): string {
-  return name
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
-}
-
-function airlineColor(name: string): string {
-  const key = name[0]?.toUpperCase() ?? '';
-  return FIRST_LETTER_COLORS[key] ?? 'bg-brand-100 text-brand-700';
-}
-
-export function FlightCard({ flight, selected, onSelect }: FlightCardProps) {
-  const [bookingOptions, setBookingOptions] = useState<BookingOption[] | null>(null);
-  const [loadingOptions, setLoadingOptions] = useState(false);
-  const [optionsError, setOptionsError] = useState<string | null>(null);
-
-  async function fetchAndCacheOptions(): Promise<void> {
-    const res = await fetch(`/api/flights/${flight.id}/booking-options`);
-    const data = await res.json();
-    if (!res.ok) throw Object.assign(new Error(data.message ?? 'Failed'), { status: res.status, data });
-    const options: BookingOption[] = data.options ?? [];
-    if (options.length === 0 && data.message) {
-      throw new Error(data.message);
-    }
-    setBookingOptions(options);
-  }
+export function FlightCard({
+  flight,
+  selected,
+  onSelect,
+  mode = 'lazy',
+  eagerOptions = null,
+  eagerLoading = false,
+}: FlightCardProps) {
+  const eager = mode === 'eager';
+  const lazy = useBookingOptions(flight.id);
+  const bookingOptions = eager ? eagerOptions : lazy.options;
+  const loadingOptions = eager ? eagerLoading : lazy.loading;
+  const optionsError = eager ? null : lazy.error;
+  const fetchNow = lazy.fetchNow;
 
   const handleBookingClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -59,19 +40,9 @@ export function FlightCard({ flight, selected, onSelect }: FlightCardProps) {
     }
   };
 
-  const handleViewOptions = async (e: React.MouseEvent) => {
+  const handleViewOptions = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (bookingOptions !== null && bookingOptions.length > 0) return;
-    setLoadingOptions(true);
-    setOptionsError(null);
-    try {
-      await fetchAndCacheOptions();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to load booking options';
-      setOptionsError(msg);
-    } finally {
-      setLoadingOptions(false);
-    }
+    fetchNow();
   };
 
   return (
@@ -110,41 +81,82 @@ export function FlightCard({ flight, selected, onSelect }: FlightCardProps) {
       <div className="text-right shrink-0 flex flex-col items-end gap-0.5">
         <PriceTag amount={Number(flight.price)} currency={flight.currency} />
         <div className="text-xs text-gray-400">{CABIN_CLASS_LABELS[flight.cabinClass]} · one-way</div>
-        <button
-          onClick={handleBookingClick}
-          className="mt-1.5 text-xs text-brand-600 hover:text-brand-800 font-semibold hover:underline"
-        >
-          Book on Google Flights →
-        </button>
-        <button
-          onClick={handleViewOptions}
-          disabled={loadingOptions || (bookingOptions !== null && bookingOptions.length > 0)}
-          className="mt-1 text-xs text-gray-500 hover:text-gray-700 hover:underline disabled:opacity-50"
-        >
-          {loadingOptions
-            ? 'Loading...'
-            : bookingOptions !== null && bookingOptions.length > 0
-            ? 'Sellers loaded'
-            : bookingOptions !== null && bookingOptions.length === 0
-            ? 'No sellers found'
-            : 'View booking options'}
-        </button>
-        {bookingOptions !== null && bookingOptions.length > 0 && (
-          <div className="mt-1.5 space-y-1 text-left">
-            {bookingOptions.map((opt, i) => (
-              <a
-                key={i}
-                href={opt.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="flex justify-between items-center text-xs text-brand-700 hover:underline"
+
+        {eager ? (
+          <div className="mt-1.5 w-full">
+            {loadingOptions ? (
+              <div className="space-y-1.5">
+                <div className="h-7 bg-gray-100 rounded animate-pulse" />
+              </div>
+            ) : bookingOptions !== null && bookingOptions.length > 0 ? (
+              <div className="space-y-1 text-left">
+                {bookingOptions.map((opt, i) => (
+                  <a
+                    key={i}
+                    href={opt.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="block w-full text-center bg-gray-900 hover:bg-gray-800 text-white font-medium text-sm py-2 rounded-lg transition-colors duration-150"
+                  >
+                    Book on {opt.seller} →
+                  </a>
+                ))}
+                <button
+                  onClick={handleBookingClick}
+                  className="block w-full text-center text-xs text-gray-400 hover:text-gray-600 mt-1.5 underline-offset-2 hover:underline"
+                >
+                  Or check Google Flights
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleBookingClick}
+                className="text-xs text-brand-600 hover:text-brand-800 font-semibold hover:underline"
               >
-                <span>{opt.seller}</span>
-                <span className="ml-2 font-semibold">${opt.price}</span>
-              </a>
-            ))}
+                Book on Google Flights →
+              </button>
+            )}
           </div>
+        ) : (
+          <>
+            <button
+              onClick={handleBookingClick}
+              className="mt-1.5 text-xs text-brand-600 hover:text-brand-800 font-semibold hover:underline"
+            >
+              Book on Google Flights →
+            </button>
+            <button
+              onClick={handleViewOptions}
+              disabled={loadingOptions || (bookingOptions !== null && bookingOptions.length > 0)}
+              className="mt-1 text-xs text-gray-500 hover:text-gray-700 hover:underline disabled:opacity-50"
+            >
+              {loadingOptions
+                ? 'Loading...'
+                : bookingOptions !== null && bookingOptions.length > 0
+                ? 'Sellers loaded'
+                : bookingOptions !== null && bookingOptions.length === 0
+                ? 'No sellers found'
+                : 'View booking options'}
+            </button>
+            {bookingOptions !== null && bookingOptions.length > 0 && (
+              <div className="mt-1.5 space-y-1 text-left">
+                {bookingOptions.map((opt, i) => (
+                  <a
+                    key={i}
+                    href={opt.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex justify-between items-center text-xs text-brand-700 hover:underline"
+                  >
+                    <span>{opt.seller}</span>
+                    <span className="ml-2 font-semibold">${opt.price}</span>
+                  </a>
+                ))}
+              </div>
+            )}
+          </>
         )}
         {optionsError && (
           <div className="mt-1 text-xs text-gray-400">{optionsError}</div>

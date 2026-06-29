@@ -7,6 +7,12 @@ const router = Router();
 const bookingOptionsRateLimit = createSerpApiRateLimit(5, 'serpapi:booking');
 
 router.get('/', (req, res, next) => flightsController.getFlights(req, res, next));
+router.get('/round-trip-booking-url', (req, res, next) =>
+  flightsController.getRoundTripBookingUrl(req, res, next)
+);
+router.post('/booking-options/batch', bookingOptionsRateLimit, (req, res, next) =>
+  bookingOptionsController.getBookingOptionsBatch(req, res, next)
+);
 router.get('/:id/booking-options', bookingOptionsRateLimit, (req, res, next) =>
   bookingOptionsController.getBookingOptions(req, res, next)
 );

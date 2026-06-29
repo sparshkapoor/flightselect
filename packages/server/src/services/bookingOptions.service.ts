@@ -20,6 +20,26 @@ interface SerpApiBookingResponse {
   error?: string;
 }
 
+// Looks up booking options for several flights under a single rate-limit
+// token. A comparison view shows up to 4 flights at once (the round-trip
+// bundle's 2 legs + the mix-and-match pair) — fetching each individually
+// would mean 4 client requests from the same IP within the same instant,
+// which the per-client rate limiter (1 request per window) was never meant
+// to throttle; that limiter exists to pace deliberate, one-at-a-time
+// "view options" clicks, not a single page load showing several flights.
+// Calling getBookingOptions sequentially here still makes one real SerpAPI
+// call per flight (the metered cost is unchanged) — only the per-client
+// throttle is collapsed to one token for the whole batch.
+export async function getBookingOptionsBatch(
+  flightIds: string[]
+): Promise<Record<string, { options: BookingOption[]; googleFlightsUrl?: string; message?: string }>> {
+  const results: Record<string, { options: BookingOption[]; googleFlightsUrl?: string; message?: string }> = {};
+  for (const id of flightIds) {
+    results[id] = await getBookingOptions(id);
+  }
+  return results;
+}
+
 export async function getBookingOptions(
   flightId: string
 ): Promise<{ options: BookingOption[]; googleFlightsUrl?: string; message?: string }> {

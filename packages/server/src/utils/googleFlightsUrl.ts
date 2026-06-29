@@ -114,6 +114,34 @@ export function buildGoogleFlightsTfsUrlFromSegments(
   return `https://www.google.com/travel/flights/search?tfs=${b64}&tfu=EgIIAQ&hl=en&gl=us&curr=USD`;
 }
 
+// Round-trip deep-link built from both legs' real segment lists — the one
+// case Google Flights fully pre-selects (no "choose your return" step),
+// unlike a single-leg tfs. Same top-level message as the one-way builder,
+// but field 2 = 1 (round trip) and two repeated field-3 leg entries.
+export function buildGoogleFlightsRoundTripTfsUrl(
+  outboundSegments: FlightSegment[],
+  outboundOrigin: string,
+  outboundDest: string,
+  returnSegments: FlightSegment[],
+  returnOrigin: string,
+  returnDest: string,
+): string {
+  const outboundLeg = buildLegBytes(outboundSegments, outboundOrigin, outboundDest);
+  const returnLeg = buildLegBytes(returnSegments, returnOrigin, returnDest);
+  const tfs: number[] = [
+    ...pbVarint(1, 28),
+    ...pbVarint(2, 1), // round trip
+    ...pbBytes(3, outboundLeg),
+    ...pbBytes(3, returnLeg),
+    ...pbVarint(8, 1),
+    ...pbVarint(9, 1),
+    ...pbVarint(14, 1),
+    ...pbVarint(19, 1),
+  ];
+  const b64 = Buffer.from(tfs).toString('base64url');
+  return `https://www.google.com/travel/flights/search?tfs=${b64}&tfu=EgIIAQ&hl=en&gl=us&curr=USD`;
+}
+
 // SerpAPI's `booking_token` is base64 JSON: [opaqueGoogleToken, [[origin, date,
 // dest, layoverAirport, airline, flightNum], ...]] — one entry per real
 // segment, already exactly what we need to build an accurate multi-segment
@@ -165,4 +193,32 @@ export function deriveBookingUrl(
     return buildGoogleFlightsTfsUrl(departureAirport, arrivalAirport, departureDate, match[1], match[2]);
   }
   return buildGoogleFlightsSearchUrl(departureAirport, arrivalAirport, departureDate);
+}
+
+export interface RoundTripLegInput {
+  departureAirport: string;
+  arrivalAirport: string;
+  rawData?: Record<string, unknown> | null;
+}
+
+// Derives a combined round-trip booking URL for a matched outbound+return
+// pair. Returns null (not a broken link) if either leg is missing the real
+// segment data needed to build an accurate tfs — there's no honest fallback
+// for a round-trip CTA specifically, since a single-flight-number guess for
+// one leg would describe a different (possibly nonexistent) itinerary.
+export function deriveRoundTripBookingUrl(
+  outbound: RoundTripLegInput,
+  ret: RoundTripLegInput,
+): string | null {
+  const outboundToken = typeof outbound.rawData?.bookingToken === 'string' ? outbound.rawData.bookingToken : null;
+  const returnToken = typeof ret.rawData?.bookingToken === 'string' ? ret.rawData.bookingToken : null;
+
+  const outboundSegments = outboundToken ? parseSegmentsFromBookingToken(outboundToken) : null;
+  const returnSegments = returnToken ? parseSegmentsFromBookingToken(returnToken) : null;
+  if (!outboundSegments || !returnSegments) return null;
+
+  return buildGoogleFlightsRoundTripTfsUrl(
+    outboundSegments, outbound.departureAirport, outbound.arrivalAirport,
+    returnSegments, ret.departureAirport, ret.arrivalAirport,
+  );
 }

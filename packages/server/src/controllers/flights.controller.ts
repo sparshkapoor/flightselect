@@ -22,6 +22,19 @@ export class FlightsController {
       next(error);
     }
   }
+
+  async getRoundTripBookingUrl(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { outboundId, returnId } = req.query as { outboundId?: string; returnId?: string };
+      if (!outboundId || !returnId) {
+        throw new AppError(400, 'outboundId and returnId query params are required');
+      }
+      const url = await flightService.getRoundTripBookingUrl(outboundId, returnId);
+      res.json({ status: 'ok', data: { url } });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const flightsController = new FlightsController();

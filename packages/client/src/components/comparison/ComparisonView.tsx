@@ -1,12 +1,13 @@
-import type { Comparison, Flight } from '@flightselect/shared';
+import { useMemo } from 'react';
+import type { Comparison, Flight, BookingOption } from '@flightselect/shared';
 import { RecommendedOption } from '@flightselect/shared';
-import { PriceTag } from '../results/PriceTag';
-import { FlightCard } from '../results/FlightCard';
-import { SavingsBadge } from './SavingsBadge';
+import { RoundTripBundle } from './RoundTripBundle';
+import { MixAndMatchSection } from './MixAndMatchSection';
 import { PriceComparisonChart } from './PriceComparisonChart';
 import { ComparisonTable } from './ComparisonTable';
 import { AIInsightCard } from './AIInsightCard';
-
+import { useRoundTripBookingUrl } from '../../hooks/useRoundTripBookingUrl';
+import { useBatchBookingOptions } from '../../hooks/useBatchBookingOptions';
 
 interface ComparisonViewProps {
   comparison: Comparison;
@@ -14,12 +15,6 @@ interface ComparisonViewProps {
   oneWayOutboundFlights: Flight[];
   oneWayReturnFlights: Flight[];
 }
-
-const RECOMMENDATION_LABELS: Record<RecommendedOption, string> = {
-  [RecommendedOption.ROUND_TRIP]: 'Same Airline Wins',
-  [RecommendedOption.ONE_WAY]: 'Mix & Match Saves',
-  [RecommendedOption.MIXED]: 'Mixed Strategy',
-};
 
 export function ComparisonView({
   comparison,
@@ -32,134 +27,141 @@ export function ComparisonView({
   const destination =
     oneWayOutboundFlights[0]?.arrivalAirport ?? roundTripFlights[0]?.arrivalAirport ?? '';
 
-  if (comparison.roundTripTotalPrice === null) {
+  const hasRoundTrip = comparison.roundTripTotalPrice !== null && roundTripFlights[0] && roundTripFlights[1];
+  const rtOutbound = roundTripFlights[0];
+  const rtReturn = roundTripFlights[1];
+  const bestOutbound = oneWayOutboundFlights[0] ?? roundTripFlights[0];
+
+  const { data: combinedBookingUrl } = useRoundTripBookingUrl(
+    hasRoundTrip ? rtOutbound.id : null,
+    hasRoundTrip ? rtReturn.id : null
+  );
+
+  // This view shows at most 4 flights at once (round-trip pair + mix & match
+  // pair) — fetch all of their seller links in one batched request rather
+  // than one request per card, since the per-client rate limit allows only
+  // one booking-options request per window.
+  const eagerFlightIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (hasRoundTrip) {
+      ids.add(rtOutbound.id);
+      ids.add(rtReturn.id);
+    } else if (bestOutbound) {
+      ids.add(bestOutbound.id);
+    }
+    if (oneWayOutboundFlights[0]) ids.add(oneWayOutboundFlights[0].id);
+    if (oneWayReturnFlights[0]) ids.add(oneWayReturnFlights[0].id);
+    return [...ids];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasRoundTrip, rtOutbound?.id, rtReturn?.id, bestOutbound?.id, oneWayOutboundFlights[0]?.id, oneWayReturnFlights[0]?.id]);
+
+  const { data: batchOptions, isLoading: optionsLoading } = useBatchBookingOptions(eagerFlightIds);
+
+  const optionsFor = (id: string | undefined): BookingOption[] | null =>
+    id ? batchOptions?.[id]?.options ?? null : null;
+
+  const savingsAmount = comparison.priceDifference !== null ? Math.abs(Number(comparison.priceDifference)) : null;
+  const isRoundTripCheapest = comparison.recommendedOption === RecommendedOption.ROUND_TRIP;
+
+  if (!hasRoundTrip) {
+    // No return flights for this route — render a graceful single-leg hero
+    // (same shell as the round-trip case) instead of a separate apologetic block.
+    if (!bestOutbound) return null;
+
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-900">One-Way Pricing</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Your Trip</h2>
         </div>
 
         {origin && destination && (
           <AIInsightCard comparison={comparison} origin={origin} destination={destination} />
         )}
 
-        <div className="card text-sm text-gray-600">
-          No return flights were found for this route, so a round-trip comparison isn't available.
-        </div>
-
-        <div className="card text-center">
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-            Best One-Way Price
-          </div>
-          <PriceTag amount={Number(comparison.oneWayTotalPrice)} size="lg" />
-        </div>
-
-        <div className="space-y-2">
-          {oneWayOutboundFlights.map((f) => (
-            <FlightCard key={f.id} flight={f} />
-          ))}
-        </div>
+        <RoundTripBundle
+          outboundFlight={bestOutbound}
+          returnFlight={null}
+          totalPrice={Number(comparison.oneWayTotalPrice)}
+          isCheapest={false}
+          savingsAmount={null}
+          combinedBookingUrl={null}
+          outboundOptions={optionsFor(bestOutbound.id)}
+          returnOptions={null}
+          optionsLoading={optionsLoading}
+        />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Same Airline vs. Best Mix</h2>
-        <span className="bg-brand-100 text-brand-700 px-4 py-1.5 rounded-full font-semibold text-sm">
-          {RECOMMENDATION_LABELS[comparison.recommendedOption]}
-        </span>
+        <h2 className="text-2xl font-bold text-gray-900">Your Trip</h2>
       </div>
 
-      {/* AI insight — compact, non-blocking, hides itself if RAG has no data */}
       {origin && destination && (
-        <AIInsightCard
-          comparison={comparison}
-          origin={origin}
-          destination={destination}
-        />
+        <AIInsightCard comparison={comparison} origin={origin} destination={destination} />
       )}
 
-      {/* Price overview cards */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className={`card text-center ${comparison.recommendedOption === RecommendedOption.ROUND_TRIP ? 'ring-2 ring-green-400' : ''}`}>
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-            Same Airline
+      <RoundTripBundle
+        outboundFlight={rtOutbound}
+        returnFlight={rtReturn}
+        totalPrice={Number(comparison.roundTripTotalPrice)}
+        isCheapest={isRoundTripCheapest}
+        savingsAmount={savingsAmount}
+        combinedBookingUrl={combinedBookingUrl}
+        outboundOptions={optionsFor(rtOutbound.id)}
+        returnOptions={optionsFor(rtReturn.id)}
+        optionsLoading={optionsLoading}
+      />
+
+      {oneWayOutboundFlights[0] && oneWayReturnFlights[0] && (
+        <>
+          <div className="flex items-center gap-3 my-10">
+            <div className="flex-1 h-px bg-gray-200" />
+            <span className="text-xs font-medium text-gray-400 uppercase tracking-wide shrink-0">
+              or mix airlines
+            </span>
+            <div className="flex-1 h-px bg-gray-200" />
           </div>
-          <PriceTag
-            amount={Number(comparison.roundTripTotalPrice)}
-            size="lg"
-            highlight={comparison.recommendedOption === RecommendedOption.ROUND_TRIP}
+
+          <MixAndMatchSection
+            outboundFlight={oneWayOutboundFlights[0]}
+            returnFlight={oneWayReturnFlights[0]}
+            totalPrice={Number(comparison.oneWayTotalPrice)}
+            isCheapest={!isRoundTripCheapest}
+            savingsAmount={savingsAmount}
+            outboundOptions={optionsFor(oneWayOutboundFlights[0].id)}
+            returnOptions={optionsFor(oneWayReturnFlights[0].id)}
+            optionsLoading={optionsLoading}
           />
-          {roundTripFlights[0] && (
-            <div className="text-xs text-gray-400 mt-1">{roundTripFlights[0].airline}</div>
-          )}
-        </div>
+        </>
+      )}
 
-        <SavingsBadge
-          priceDifference={Number(comparison.priceDifference)}
-          recommendedOption={comparison.recommendedOption}
-        />
-
-        <div className={`card text-center ${comparison.recommendedOption === RecommendedOption.ONE_WAY ? 'ring-2 ring-green-400' : ''}`}>
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-            Best Mix
+      <details className="border-t border-gray-200 pt-6">
+        <summary className="text-sm font-semibold text-gray-500 uppercase tracking-wide cursor-pointer">
+          See full price breakdown
+        </summary>
+        <div className="mt-4 space-y-6">
+          <div>
+            <h3 className="font-semibold text-gray-700 mb-3">Price Comparison</h3>
+            <PriceComparisonChart
+              roundTripTotal={Number(comparison.roundTripTotalPrice)}
+              oneWayTotal={Number(comparison.oneWayTotalPrice)}
+            />
           </div>
-          <PriceTag
-            amount={Number(comparison.oneWayTotalPrice)}
-            size="lg"
-            highlight={comparison.recommendedOption === RecommendedOption.ONE_WAY}
-          />
-          {oneWayOutboundFlights[0] && oneWayReturnFlights[0] && (
-            <div className="text-xs text-gray-400 mt-1">
-              {oneWayOutboundFlights[0].airline} + {oneWayReturnFlights[0].airline}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Chart */}
-      <div className="card">
-        <h3 className="font-semibold text-gray-700 mb-3">Price Comparison</h3>
-        <PriceComparisonChart
-          roundTripTotal={Number(comparison.roundTripTotalPrice)}
-          oneWayTotal={Number(comparison.oneWayTotalPrice)}
-        />
-      </div>
-
-      {/* Comparison table */}
-      <div className="card">
-        <h3 className="font-semibold text-gray-700 mb-3">Detailed Comparison</h3>
-        <ComparisonTable
-          roundTripFlights={roundTripFlights}
-          oneWayOutboundFlights={oneWayOutboundFlights}
-          oneWayReturnFlights={oneWayReturnFlights}
-          roundTripTotal={Number(comparison.roundTripTotalPrice)}
-          oneWayTotal={Number(comparison.oneWayTotalPrice)}
-        />
-      </div>
-
-      {/* Flight details */}
-      <div className="grid grid-cols-2 gap-6">
-        <div>
-          <h3 className="font-semibold text-gray-700 mb-3">Same Airline</h3>
-          <div className="space-y-2">
-            {roundTripFlights.map((f) => (
-              <FlightCard key={f.id} flight={f} />
-            ))}
+          <div>
+            <h3 className="font-semibold text-gray-700 mb-3">Detailed Comparison</h3>
+            <ComparisonTable
+              roundTripFlights={roundTripFlights}
+              oneWayOutboundFlights={oneWayOutboundFlights}
+              oneWayReturnFlights={oneWayReturnFlights}
+              roundTripTotal={Number(comparison.roundTripTotalPrice)}
+              oneWayTotal={Number(comparison.oneWayTotalPrice)}
+            />
           </div>
         </div>
-        <div>
-          <h3 className="font-semibold text-gray-700 mb-3">Best Mix</h3>
-          <div className="space-y-2">
-            {[...oneWayOutboundFlights, ...oneWayReturnFlights].map((f) => (
-              <FlightCard key={f.id} flight={f} />
-            ))}
-          </div>
-        </div>
-      </div>
+      </details>
     </div>
   );
 }
