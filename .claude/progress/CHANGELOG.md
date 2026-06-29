@@ -818,3 +818,78 @@ Wrote `packages/client/DESIGN.md` as the literal source of truth — every token
 2. **`EmptyState`'s default ✈️ icon and `🔖`/`🔍` icons on other pages** left as-is — large single emoji as an empty-state glyph isn't a design-system violation (unlike the brand-mark emoji removed in session 11), just a content choice.
 3. **`AdvancedFilters`' expand/collapse** fades in on mount but has no exit transition (instant unmount on collapse) — a minor asymmetry, not fixed, to avoid introducing a height-transition hack or a new animation dependency for marginal gain.
 4. nginx port 80 conflict, blog post screenshots, tfs URL real-world validation (now more confident given the field 19/2 fix was verified byte-for-byte against real captured URLs, but Google could still change the schema) — unchanged from prior sessions.
+
+---
+
+## Session 13 (2026-06-29)
+
+### Context
+After session 12 shipped, the user reported six issues from live use: (1) flight times disagreed with Google's; (2) mix-and-match's "Book on Google Flights" link hid behind a loading spinner while other cards linked instantly; (3) AI insight said "insufficient data" for routes with no search history (e.g. YYZ→LAS); (4) the hero always showed same-airline even when mixing was cheaper; (5) return flights required scrolling past the entire outbound list; (6) the user wanted a tasteful "liquid glass" treatment plus more motion. All root causes were re-verified by reading the actual code this session (per the session-12 guardrail), not recalled from memory. Step 0, per explicit instruction: commit and push the session-12 working tree to `main` first, no `Co-Authored-By` trailer.
+
+---
+
+### 1. Timezone bug — flight times now match Google
+
+Root cause: `normalizeFlight` (`packages/server/src/scrapers/google-flights/index.ts`) did `new Date(serpApiLocalString)` on SerpAPI's airport-**local** wall-clock strings (no timezone marker). On a non-UTC server, `new Date()` applied the server's own offset; the client's `formatTime` then reads `getUTCHours()` (by design — see its comment), so the displayed clock silently shifted by the server's UTC offset. A tfs deep-link only ever encodes flight#+date+airport, never times, so Google always shows live, correct times — our snapshot just wasn't parsed to match.
+
+**Fix**: added `parseAirportLocalTime(s)`, which regex-extracts the literal Y/M/D/H/M digits (handles both the real API's `"YYYY-MM-DD HH:MM"` and this repo's `"YYYY-MM-DDTHH:MM:SS"` mock format) and pins them to UTC via `Date.UTC(...)`, so `getUTCHours()` reproduces the original digits on any server timezone. Applied to `departureTime`, `arrivalTime`, and the layover-gap estimate. Added a test asserting known SerpAPI strings → expected `getUTCHours()`/`getUTCMinutes()`, and confirmed it holds under `TZ=America/Los_Angeles` and `TZ=Asia/Tokyo`.
+
+Also added a "Prices as of {scrapedAt}" caption to the hero (`RoundTripBundle.tsx`, via new `formatScrapedAt` in `formatters.ts`) — cheap honesty about snapshot-vs-live price drift, which is real and not a bug.
+
+**Files**: `packages/server/src/scrapers/google-flights/index.ts`, `index.test.ts`, `packages/client/src/utils/formatters.ts`, `packages/client/src/components/comparison/RoundTripBundle.tsx`
+
+---
+
+### 2. Eager-mode booking link no longer hides behind the loading skeleton
+
+`FlightCard.tsx`'s eager branch only rendered the Google Flights fallback link in the "not loading AND no sellers" case — while `loadingOptions` was true, neither the seller buttons nor the Google link rendered, just a bare skeleton. Restructured so the skeleton/seller-buttons render independently and the Google Flights link (`flight.bookingUrl`, available immediately, no fetch needed) always renders regardless of loading state — matching how the lazy branch already worked.
+
+**Files**: `packages/client/src/components/results/FlightCard.tsx`
+
+---
+
+### 3. Hero now shows whichever option is actually cheaper
+
+`ComparisonView.tsx` hardcoded `RoundTripBundle` as the hero and `MixAndMatchSection` as the permanently-demoted alternative, regardless of `comparison.recommendedOption`. Gave `MixAndMatchSection` a `hero` prop (surface-2 panel, `.text-display` price, accent eyebrow — the same visual weight `RoundTripBundle` already had) and made `ComparisonView` swap which one renders first based on `isRoundTripCheapest`, with the divider copy flipping too ("or mix airlines" vs. "or same airline"). The no-return single-leg case is unchanged.
+
+**Files**: `packages/client/src/components/comparison/ComparisonView.tsx`, `MixAndMatchSection.tsx`
+
+---
+
+### 4. Outbound/Return tabs
+
+`SearchResultsPage.tsx` stacked the full outbound list above the full return list, requiring a long scroll on round trips. Replaced with a segmented `[ Outbound (n) | Return (n) ]` pill control (local `useState`, reset to "outbound" on a new `searchQueryId`) showing one direction at a time; one-way searches are unaffected (no tabs, just the outbound list). `ResultsContainer` keeps its staggered entrance — switching tabs remounts it (different `key`), which retriggers the animation, which reads as intentional rather than as a bug.
+
+**Files**: `packages/client/src/pages/SearchResultsPage.tsx`
+
+---
+
+### 5. Real historical fare data for the AI insight (US DOT BTS seed)
+
+The user wanted real public data, not synthetic rows. Added `rag/seed_dot_airfares.py`, a one-time script that fetches the US DOT BTS Consumer Airfare Report (Table 1a) via the Socrata CSV API and writes `data/flights/dot_airfares.csv` in `rag.ingest`'s schema.
+
+**Plan-vs-reality correction made mid-implementation**: the original plan assumed the dataset had `airport_1`/`airport_2` IATA columns. It doesn't — the real schema (checked live via the Socrata endpoint) only has `city1`/`city2` metro-area names (e.g. `"New York City, NY (Metropolitan Area)"`). Since `rag/server.py`'s `/query` does an *exact* metadata match on `origin`/`destination` against the IATA codes the app actually sends, city-name strings would never have matched anything — the seed would have silently produced zero usable grounding. Built `CITY_TO_IATA`, a ~150-entry mapping from this dataset's exact metro-name strings to each metro's primary airport; unmapped/uncertain metros are skipped and logged, never guessed.
+
+Other fixes made while actually running this (not just writing it): `rag/vectorstore.py`'s `ingest()` raised `Batch size of 40000 is greater than max batch size of 5461` from Chroma — added internal chunking (`_MAX_BATCH_SIZE = 5000`) so any caller, not just this seed, can pass arbitrarily large ingests. Ran the full pipeline for real: 20,000 raw DOT rows → 40,000 seeded rows (both directions) → ingested successfully; spot-checked LAX→JFK returns a real grounded answer ("$320 is low compared to the average prices observed on this route"), and confirmed YYZ→LAS (not in this US-only dataset) honestly still returns "insufficient data" rather than fabricating one. Added `rag/tests/test_seed_dot_airfares.py` (functional, no mocked HTTP — exercises the real transform logic: directionality, IATA mapping, date/duration derivation, skip behavior).
+
+**Files**: `rag/seed_dot_airfares.py` (new), `rag/tests/test_seed_dot_airfares.py` (new), `rag/vectorstore.py`, `README.md`, `.claude/instructions/INSTRUCTIONS.md`
+
+---
+
+### 6. Rejected true "liquid glass"; shipped surface-ladder polish + motion instead
+
+User asked for an Apple-style liquid-glass card treatment and wanted it researched, not guessed. Two independent findings killed it: (1) **web viability** — true refraction (SVG `feDisplacementMap` as `backdrop-filter`) is Chromium-only, breaks in Safari/Firefox, is GPU-heavy, and fails text contrast — disqualifying for a text-dense flight UI; (2) **design-peer research** — read the actual design systems of this app's own stated influences (Linear, Raycast, Runway) plus Apple itself (via `awsome-mod/awesome-design-md`, a cloned reference repo, not committed) and found **zero glass on content cards** in any of them. Linear/Raycast carry their "featured/active" state purely via the surface-color ladder (exactly what this app's `DESIGN.md` already specifies); even Apple, who invented the effect, restricts `backdrop-filter: blur` on the web to functional sticky chrome, never a card.
+
+Shipped instead: `backdrop-blur-md` on the sticky `Header` only (the one Apple-validated, cross-browser-safe usage); a CTA hover micro-scale (`hover:scale-[1.015]`, paired with the existing `-translate-y-px` lift) on `.btn-primary` and the brand-600 booking CTAs; a shimmer-sweep `.skeleton` class (replacing flat `animate-pulse`) on every loading placeholder. Updated `DESIGN.md` to document the sticky-header exception and why it isn't a reversal of "no glass on cards" — the rule there is unchanged, just clarified with the research that backs it.
+
+**Files**: `packages/client/DESIGN.md`, `packages/client/src/components/layout/Header.tsx`, `packages/client/src/styles/globals.css`, `packages/client/tailwind.config.js`, `packages/client/src/components/comparison/RoundTripBundle.tsx`, `packages/client/src/components/results/FlightCard.tsx`, `packages/client/src/components/comparison/AIInsightCard.tsx`
+
+---
+
+### Tests
+Server: 32 tests pass (`tsc --noEmit` clean), including the new timezone tests verified under both `TZ=America/Los_Angeles` and `TZ=Asia/Tokyo`. Client: 41 tests pass (`tsc --noEmit` clean). RAG: 7 pytest tests pass (5 new for the seed script, 2 pre-existing retrieval-scoping tests), plus a real (non-mocked) end-to-end run of the seed→ingest→query pipeline.
+
+### Outstanding Issues (as of end of session 13)
+1. **Visual verification moved to the user's own server, not done by me locally** — the user wants to verify on `sparsh@server.local` (their eventual nginx + Cloudflare host) rather than my local headless Chromium, since they'll deploy there anyway. Server has Colima (not Kubernetes — Lima has the *capability* to create a k3s instance via `limactl create --name=k3s`, but none exists) providing the Docker daemon; it was found stopped and started (`colima start --cpu 4 --memory 8 --disk 100`). All three Docker images now confirmed building clean against the session-13 code: `flightselect-api` (346MB), `flightselect-nginx` (76MB, includes the client `vite build`), `flightselect-rag` (9GB — torch/sentence-transformers/chromadb). Actual on-screen visual verification (the six-point checklist: best-option hero, scrapedAt caption, outbound/return tabs, frosted sticky header, skeleton shimmer, CTA hover scale) is still pending — not yet performed.
+2. Items 2–4 from session 12's outstanding list are unchanged (EmptyState emoji icons, AdvancedFilters' missing collapse exit transition, nginx port 80 conflict / blog screenshots / tfs real-world validation).
+3. The DOT BTS seed's `CITY_TO_IATA` table covers ~150 of the dataset's ~170 distinct metro areas — a handful of very small regional markets were left unmapped (skipped, not guessed) rather than risk a wrong IATA code.
