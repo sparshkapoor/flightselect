@@ -700,3 +700,121 @@ New tests in `packages/server/src/scrapers/google-flights/index.test.ts`:
 1. **nginx port 80 conflict** — unchanged from session 7.
 2. **Blog post screenshots** — unchanged from session 6.
 3. **tfs URL real-world validation** — the protobuf format is reverse-engineered; if Google changes the tfs schema, URLs will silently break. Monitor post-deploy.
+
+---
+
+## Session 11 (2026-06-29)
+
+### Context
+After the round-trip/one-way comparison redesign shipped (session prior, `0d35a32`), the app overall still "looked extremely basic and like the old one." Full visual overhaul requested: dark theme (Linear + Vercel/Raycast aesthetic), bold animated entrance on the landing page, subtle motion elsewhere. Full design/inventory work was done in a prior plan-mode session and handed off — see `HANDOFF_DARK_THEME_REDESIGN.md` in this folder for the complete per-file before/after rationale. This session executed that handoff.
+
+---
+
+### 1. Foundation — `tailwind.config.js` + `globals.css`
+
+Replaced the blue `brand` Tailwind scale with violet/indigo (`50/100/300/400/500/600/700/900`); added `fadeInUp` and `blobDrift` keyframes/animations for the landing hero. `globals.css` base styles flipped to dark: `body` → `bg-black text-zinc-100`; `.card` → `bg-zinc-900 ring-1 ring-white/5` (dropped the shadow — doesn't register on near-black); `.btn-secondary` → `bg-zinc-800` family; `.input-field` → `bg-zinc-900 border-zinc-700`. Added `input[type=date/time] { color-scheme: dark }` so native date/time picker icons aren't dark-on-dark.
+
+**Files**: `packages/client/tailwind.config.js`, `packages/client/src/styles/globals.css`
+
+---
+
+### 2. Semantic-color flip for status badges
+
+Every `bg-{color}-50 text-{color}-700 border-{color}-200` badge (direct/layover, savings pills, error boxes) flipped to `bg-{color}-500/10 text-{color}-400 border-{color}-500/20` for legibility against near-black surfaces.
+
+**Files**: `LayoverBadge.tsx`, `MixAndMatchSection.tsx`, `RoundTripBundle.tsx`, `ErrorBoundary.tsx`, `SearchForm.tsx`, `AdvancedFilters.tsx`
+
+---
+
+### 3. `HomePage.tsx` — bold animated hero
+
+Full rewrite: `bg-black` base with 3 absolutely-positioned blurred gradient blobs (`animate-blobDrift`), staggered `animate-fadeInUp` entrance for headline → subtext → form. Dropped the ✈️ emoji (didn't fit the new aesthetic tier — plain wordmark for now). Pure CSS, no new animation dependency. Removed the extra glass-panel wrapper around `SearchForm` to avoid a double border with `SearchForm`'s own (now dark) `.card` — it sits directly on the gradient blobs instead.
+
+**Files**: `packages/client/src/pages/HomePage.tsx`
+
+---
+
+### 4. Mechanical gray→zinc pass — everything else
+
+Same pattern across the rest of the app, no structural/logic changes: `text-gray-900→text-zinc-100/white`, `text-gray-700→text-zinc-300`, `text-gray-500/400→text-zinc-400/500`, `border-gray-200/300→border-zinc-800/700`, `bg-white→bg-zinc-900`, `bg-gray-50/100→bg-zinc-800/900`. Header got a glassy `bg-black/80 backdrop-blur-xl` treatment and also dropped its ✈️ emoji.
+
+**Files**: `Header.tsx`, `Footer.tsx`, `AirportInput.tsx`, `DatePicker.tsx`, `PassengerSelector.tsx`, `CabinClassSelector.tsx`, `FilterSidebar.tsx`, `FlightTimeline.tsx`, `PriceTag.tsx`, `ResultsContainer.tsx`, `AIInsightCard.tsx`, `ComparisonTable.tsx`, `ComparisonView.tsx`, `EmptyState.tsx`, `LoadingSpinner.tsx`, `Tooltip.tsx`, `SearchResultsPage.tsx`, `SavedSearchesPage.tsx`, `SettingsPage.tsx`
+
+---
+
+### 5. `PriceComparisonChart.tsx` — hardcoded hex + grid legibility
+
+`#16a34a → #34d399` (emerald-400), `#3b82f6 → #8b5cf6` (new brand-500) for the bar fills — these are raw hex in JS, not Tailwind classes, so they don't pick up CSS-level theme changes. Added explicit `stroke="#27272a"` on `CartesianGrid` and `fill="#a1a1aa"` on axis ticks — previously unstyled/default, would have rendered near-invisible on black.
+
+**Files**: `packages/client/src/components/comparison/PriceComparisonChart.tsx`
+
+---
+
+### 6. `FlightCard.tsx` — lazy-mode booking link reorder
+
+In `mode="lazy"` (the big browsable outbound/return list), promoted "View booking options" above "Book on Google Flights" (relabeled "Or check Google Flights"), matching the visual hierarchy eager mode already had. Pure JSX reorder + label/color change — `useBookingOptions`/`fetchNow` click-to-fetch behavior is untouched, no new network calls.
+
+**Files**: `packages/client/src/components/results/FlightCard.tsx`
+
+---
+
+### Tests
+Not yet run this session — see Outstanding Issues below.
+
+### Outstanding Issues (as of end of session 11)
+1. ~~Verification pending~~ — done in session 12.
+2. ~~`airlineBadge.ts` left unchanged~~ — fixed in session 12 (was a real legibility bug, not just an aesthetic choice).
+3. ~~`DESIGN.md` not updated for dark palette~~ — superseded by `packages/client/DESIGN.md` in session 12.
+4. nginx port 80 conflict, blog post screenshots, tfs URL real-world validation — unchanged from prior sessions.
+
+---
+
+## Session 12 (2026-06-29)
+
+### Context
+User reported three things after session 11: (1) the "See full price breakdown" disclosure looked ugly (bare browser-default `<details>`), (2) booking links — round-trip gave a generic Google Flights link instead of pre-selecting both legs, and one-way still dropped into the round-trip "choose your return" step, (3) the dark redesign still "looked like AI slop" — flat, no real depth system, motion that wasn't actually visible, and a filter sidebar stretching the full page height. The user also flagged a recurring process problem: I had described session 11's redesign as having "glassy blur panels" that were never actually in the code — a memory/drift error, not a real description of the shipped code. They asked for a durable fix to that pattern, not just an apology.
+
+---
+
+### 1. Anti-drift guardrail (process fix, not code)
+
+Added a **Critical Rule** to `.claude/instructions/CLAUDE.md` and a matching note in `INSTRUCTIONS.md`: never reason about code from memory — re-read actual files every session before planning/editing, and after implementing anything called a "design," re-open the changed files and verify they match the written spec before reporting done. Also saved as a `feedback` memory (`feedback_reread_code_dont_recall`) outside the repo for cross-session persistence, and corrected the stale `project_booking_link_ceiling` memory (see #2 below).
+
+**Files**: `.claude/instructions/CLAUDE.md`, `.claude/instructions/INSTRUCTIONS.md`
+
+---
+
+### 2. Fixed the actual booking-URL protobuf bug (was never a platform constraint)
+
+A prior session had concluded the one-way "choose your return" behavior was an unfixable Google Flights platform quirk. It wasn't — decoding two real reference URLs the user captured (one correct round-trip, one correct one-way) showed **trip type is encoded in field 19, not field 2**: one-way ends `field19=2`, round-trip ends `field19=1`, and **field 2 is `2` in both**. Our builders had this backwards (one-way set `field19=1`, causing Google to show the return-picker; round-trip set `field2=1`, which Google can't parse, causing the generic-link fallback) and were also missing field 16 (a `{f1=maxUint64}` "no-limit" sentinel present on every real Google-issued tfs). A test had asserted the wrong model (`081c1001` = "field2=1 = round trip") and locked the bug in.
+
+**Fix**: added a `NO_LIMIT_F16` byte constant and corrected `pbVarint(19, ...)`/`pbVarint(2, ...)` in all three builders (`buildGoogleFlightsTfsUrl`, `buildGoogleFlightsTfsUrlFromSegments`, `buildGoogleFlightsRoundTripTfsUrl`). Leg/segment encoding (`buildLegBytes`) was untouched — already byte-verified separately. Verified the fix by generating both URL types and diffing hex byte-for-byte against the user's two reference URLs — exact match, including field 16.
+
+**Files**: `packages/server/src/utils/googleFlightsUrl.ts`, `packages/server/src/scrapers/google-flights/index.test.ts` (rewrote the wrong assertions, added field-19 checks to the one-way tests)
+
+---
+
+### 3. Full design-system rebuild — `packages/client/DESIGN.md`
+
+Session 11's "redesign" was a recolor (swap gray for zinc), not a real design system — no depth model, no real type scale, motion too subtle to perceive, and at least two leftover bugs from incomplete passes (`ComparisonView.tsx` still had `text-gray-900` on one of its two "Your Trip" headings despite a prior "all occurrences replaced" claim; `FlightCard.tsx`'s eager-mode seller button was still `bg-gray-900 hover:bg-gray-800`, a light-theme dark-button trick that's nearly invisible against a dark-theme card).
+
+Pulled the full Linear and Runway `DESIGN.md` specs from `voltagent/awesome-design-md` (24KB and 14KB respectively — concrete token ladders and component anatomy, not just a color summary) and synthesized a real system: **Linear's engineered structure** (four-step surface ladder — canvas/surface-1/surface-2/surface-3 — depth via background lift + 1px hairline borders, zero shadows) **+ Runway's editorial voice** (single typeface used at every size, tight negative-tracked headlines, uppercase eyebrow labels as the only navigational structure). Purple stays as the one accent — the user clarified they hadn't reacted against purple, they'd objected to it barely being used; the new system mandates the accent appear in 3+ places per screen (CTA, focus ring, a data-driven highlight like the recommended option's border).
+
+Wrote `packages/client/DESIGN.md` as the literal source of truth — every token in it (canvas/surface-1/surface-2/surface-3, hairline/hairline-strong, ink/ink-muted/ink-subtle/ink-cool/ink-faint, brand-400/500/600/700) is a real Tailwind class added to `tailwind.config.js`, not an aspiration, specifically so future sessions (including me) can check code against it rather than trust a claim. Deleted the stale light-theme `components/comparison/DESIGN.md` it supersedes.
+
+**New tokens** (`tailwind.config.js`, `globals.css`): `canvas`/`surface-{1,2,3}`/`hairline`/`hairline-strong`/`ink-*` color scale; `Inter` (sans) + `JetBrains Mono` (mono, for flight numbers/airport codes/durations/table numbers) loaded via Google Fonts in `index.html`; `.text-display`/`.text-h1`/`.text-h2`/`.text-eyebrow` utility classes; `.card-hover` (surface lift + border step + 1px translate on hover, replacing shadow-based hover entirely); a static low-opacity grid texture on `body` for engineered texture without motion; a `prefers-reduced-motion` media query disabling all animation/transition durations.
+
+**Re-engineered every component** (not just recolored): `RoundTripBundle.tsx` (the hero) now lifts to depth-2 + accent-tinted eyebrow when it's the recommended option, uses `.text-display` for the price, refined the CTA from a full-height neon slab to a proper `rounded-lg` Linear-style button; `ComparisonView.tsx` fixed the leftover `text-gray-900` bug, restyled the bare `<details>` disclosure with a rotating chevron and a proper surface-1 body, added staggered entrance; `FilterSidebar.tsx` got `self-start sticky top-20` — **this was the literal bug from the user's screenshot**: the parent flex container's default `align-items: stretch` was forcing the sidebar to the height of the results column; eyebrow-style section labels, no more dead trailing space; `FlightCard.tsx` fixed the invisible eager-mode button and reordered/relabeled consistent with the rest; `airlineBadge.ts` flipped from light-tint-on-dark (a real legibility bug — light pastel chips on near-black cards) to the same dark-tint pattern used everywhere else; `HomePage.tsx` rebuilt with one large ambient glow with real travel distance (140px, vs. session 11's sub-40px "drift" that wasn't perceptible) and an opacity pulse, plus an editorial landing headline (the question itself, not a redundant giant repeat of the brand name already in the header). Every list/card/section now has a staggered `fadeInUp` entrance, including the search results page, which previously had zero animation.
+
+**Files**: `packages/client/DESIGN.md` (new), `tailwind.config.js`, `src/styles/globals.css`, `index.html`, and essentially every component in `src/components/` and `src/pages/` — see the diff for the full list; the pattern is described once above rather than enumerated per-file.
+
+---
+
+### Tests
+`tsc --noEmit` clean on both packages. 41 client tests + 30 server tests pass (server suite includes the rewritten booking-URL assertions).
+
+### Outstanding Issues (as of end of session 12)
+1. **Visual verification not done by me** — per explicit user instruction this session ("don't test the whole website yourself, I will npm run dev and check myself"), I did not start the dev server or screenshot the app. The user is verifying visually themselves.
+2. **`EmptyState`'s default ✈️ icon and `🔖`/`🔍` icons on other pages** left as-is — large single emoji as an empty-state glyph isn't a design-system violation (unlike the brand-mark emoji removed in session 11), just a content choice.
+3. **`AdvancedFilters`' expand/collapse** fades in on mount but has no exit transition (instant unmount on collapse) — a minor asymmetry, not fixed, to avoid introducing a height-transition hack or a new animation dependency for marginal gain.
+4. nginx port 80 conflict, blog post screenshots, tfs URL real-world validation (now more confident given the field 19/2 fix was verified byte-for-byte against real captured URLs, but Google could still change the schema) — unchanged from prior sessions.

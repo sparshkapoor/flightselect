@@ -1,13 +1,13 @@
 const FIRST_LETTER_COLORS: Record<string, string> = {
-  A: 'bg-blue-100 text-blue-700',
-  B: 'bg-indigo-100 text-indigo-700',
-  C: 'bg-cyan-100 text-cyan-700',
-  D: 'bg-sky-100 text-sky-700',
-  E: 'bg-green-100 text-green-700',
-  F: 'bg-teal-100 text-teal-700',
-  J: 'bg-amber-100 text-amber-700',
-  S: 'bg-rose-100 text-rose-700',
-  U: 'bg-purple-100 text-purple-700',
+  A: 'bg-blue-500/10 text-blue-400',
+  B: 'bg-indigo-500/10 text-indigo-400',
+  C: 'bg-cyan-500/10 text-cyan-400',
+  D: 'bg-sky-500/10 text-sky-400',
+  E: 'bg-green-500/10 text-green-400',
+  F: 'bg-teal-500/10 text-teal-400',
+  J: 'bg-amber-500/10 text-amber-400',
+  S: 'bg-rose-500/10 text-rose-400',
+  U: 'bg-purple-500/10 text-purple-400',
 };
 
 export function airlineInitials(name: string): string {
@@ -21,5 +21,5 @@ export function airlineInitials(name: string): string {
 
 export function airlineColor(name: string): string {
   const key = name[0]?.toUpperCase() ?? '';
-  return FIRST_LETTER_COLORS[key] ?? 'bg-brand-100 text-brand-700';
+  return FIRST_LETTER_COLORS[key] ?? 'bg-brand-500/10 text-brand-400';
 }

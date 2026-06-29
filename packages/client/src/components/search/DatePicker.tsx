@@ -9,7 +9,7 @@ interface DatePickerProps {
 export function DatePicker({ label, value, onChange, min, required }: DatePickerProps) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      <label className="block text-sm font-medium text-ink-muted mb-1">{label}</label>
       <input
         type="date"
         value={value}

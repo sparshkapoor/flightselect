@@ -9,7 +9,7 @@ interface CabinClassSelectorProps {
 export function CabinClassSelector({ value, onChange }: CabinClassSelectorProps) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">Cabin Class</label>
+      <label className="block text-sm font-medium text-ink-muted mb-1">Cabin Class</label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value as CabinClass)}

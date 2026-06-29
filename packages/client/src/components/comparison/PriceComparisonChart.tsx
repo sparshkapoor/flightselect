@@ -19,11 +19,11 @@ export function PriceComparisonChart({ roundTripTotal, oneWayTotal, currency = '
     <div className="h-48">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 10, right: 20, left: 20, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} />
-          <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#23252a" />
+          <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#767d88' }} />
           <YAxis
             tickFormatter={(v) => formatPrice(v, currency)}
-            tick={{ fontSize: 11 }}
+            tick={{ fontSize: 11, fill: '#767d88' }}
             width={80}
           />
           <Tooltip formatter={(v: number) => formatPrice(v, currency)} />
@@ -31,7 +31,7 @@ export function PriceComparisonChart({ roundTripTotal, oneWayTotal, currency = '
             {data.map((entry, index) => (
               <Cell
                 key={index}
-                fill={entry.price === minPrice ? '#16a34a' : '#3b82f6'}
+                fill={entry.price === minPrice ? '#34d399' : '#8b5cf6'}
               />
             ))}
           </Bar>

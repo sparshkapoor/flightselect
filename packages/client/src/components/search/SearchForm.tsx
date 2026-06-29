@@ -38,7 +38,7 @@ export function SearchForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card space-y-5 shadow-md">
+    <form onSubmit={handleSubmit} className="card space-y-5">
       {/* Route */}
       <div className="grid grid-cols-2 gap-4">
         <AirportInput
@@ -93,7 +93,7 @@ export function SearchForm() {
 
       {/* Error display */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+        <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-lg text-sm">
           {error}
         </div>
       )}

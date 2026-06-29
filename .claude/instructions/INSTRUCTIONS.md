@@ -43,6 +43,10 @@ npm run dev           # Start both client (5173) and server (3001)
 - Local Postgres runs on 5432, so Docker Postgres is mapped to **5433**. The DATABASE_URL in `.env` reflects this.
 - If ports 5173 or 3001 are in use from previous runs, kill them: `lsof -ti :PORT | xargs kill -9`
 
+### Anti-drift rule (read before any UI/design work)
+- Re-read actual files with the Read tool before editing — never rely on memory of what code "should" contain, even from earlier in the same session. This project has had real incidents of describing code that didn't exist (e.g. claiming "glassy blur panels" were shipped when they never were).
+- `packages/client/DESIGN.md` is the source of truth for the visual system. After any UI change, re-open the edited files and confirm they actually match it before reporting the work as done.
+
 ### Known gotchas
 - The `@flightselect/shared` package must be built (`npm run build`) before the server can use its types
 - `dotenv` must be imported as the first line in `packages/server/src/index.ts` — moving it will break env loading

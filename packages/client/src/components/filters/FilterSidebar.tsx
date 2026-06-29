@@ -20,12 +20,12 @@ export function FilterSidebar({ flights }: FilterSidebarProps) {
   }, [flights]);
 
   return (
-    <div className="card space-y-5 w-64 shrink-0">
+    <div className="card self-start sticky top-20 space-y-4 w-64 shrink-0 divide-y divide-hairline">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-gray-800">Filters</h3>
+        <h3 className="text-h2 text-[1rem] text-ink">Filters</h3>
         <button
           type="button"
-          className="text-xs text-brand-600 hover:text-brand-700"
+          className="text-xs font-medium text-brand-400 hover:text-brand-300"
           onClick={store.reset}
         >
           Reset all
@@ -33,8 +33,8 @@ export function FilterSidebar({ flights }: FilterSidebarProps) {
       </div>
 
       {/* Price range */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+      <div className="pt-4">
+        <label className="text-eyebrow text-ink-subtle mb-2 block">
           Max Price: {store.maxPrice !== undefined ? `$${store.maxPrice}` : 'Any'}
         </label>
         <input
@@ -49,24 +49,24 @@ export function FilterSidebar({ flights }: FilterSidebarProps) {
           }}
           className="w-full accent-brand-600"
         />
-        <div className="flex justify-between text-xs text-gray-400 mt-1">
+        <div className="flex justify-between text-xs font-mono text-ink-faint mt-1">
           <span>${minFlightPrice}</span>
           <span>${maxFlightPrice}</span>
         </div>
       </div>
 
       {/* Layovers */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Stops</label>
+      <div className="pt-4">
+        <label className="text-eyebrow text-ink-subtle mb-2 block">Stops</label>
         <div className="flex gap-2">
           {[undefined, 0, 1, 2].map((v) => (
             <button
               key={String(v)}
               type="button"
-              className={`px-2.5 py-1 rounded text-xs border transition-colors ${
+              className={`px-2.5 py-1 rounded-md text-xs border transition-all duration-150 ${
                 store.maxLayovers === v
                   ? 'bg-brand-600 text-white border-brand-600'
-                  : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
+                  : 'bg-surface-1 text-ink-subtle border-hairline hover:border-hairline-strong'
               }`}
               onClick={() => store.setMaxLayovers(v)}
             >
@@ -77,8 +77,8 @@ export function FilterSidebar({ flights }: FilterSidebarProps) {
       </div>
 
       {/* Max Duration */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+      <div className="pt-4">
+        <label className="text-eyebrow text-ink-subtle mb-2 block">
           Max Duration: {store.maxDurationMinutes ? `${Math.floor(store.maxDurationMinutes / 60)}h ${store.maxDurationMinutes % 60}m` : 'Any'}
         </label>
         <input
@@ -93,36 +93,36 @@ export function FilterSidebar({ flights }: FilterSidebarProps) {
           }}
           className="w-full accent-brand-600"
         />
-        <div className="flex justify-between text-xs text-gray-400 mt-1">
+        <div className="flex justify-between text-xs font-mono text-ink-faint mt-1">
           <span>1h</span>
           <span>24h</span>
         </div>
       </div>
 
       {/* Departure time */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Departure Time</label>
+      <div className="pt-4">
+        <label className="text-eyebrow text-ink-subtle mb-2 block">Departure Time</label>
         <div className="flex items-center gap-2">
           <input
             type="time"
             value={store.departureTimeStart ?? ''}
             onChange={(e) => store.setDepartureTimeStart(e.target.value || undefined)}
-            className="flex-1 text-xs border border-gray-300 rounded px-2 py-1"
+            className="flex-1 text-xs font-mono border border-hairline bg-surface-1 text-ink rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-500/50"
           />
-          <span className="text-xs text-gray-400">to</span>
+          <span className="text-xs text-ink-faint">to</span>
           <input
             type="time"
             value={store.departureTimeEnd ?? ''}
             onChange={(e) => store.setDepartureTimeEnd(e.target.value || undefined)}
-            className="flex-1 text-xs border border-gray-300 rounded px-2 py-1"
+            className="flex-1 text-xs font-mono border border-hairline bg-surface-1 text-ink rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-500/50"
           />
         </div>
       </div>
 
       {/* Airlines */}
       {airlines.length > 0 && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Airlines</label>
+        <div className="pt-4 pb-1">
+          <label className="text-eyebrow text-ink-subtle mb-2 block">Airlines</label>
           <div className="space-y-1.5 max-h-48 overflow-y-auto">
             {airlines.map((airline) => (
               <label key={airline} className="flex items-center gap-2 cursor-pointer">
@@ -138,7 +138,7 @@ export function FilterSidebar({ flights }: FilterSidebarProps) {
                   }
                   className="rounded accent-brand-600"
                 />
-                <span className="text-sm text-gray-700">{airline}</span>
+                <span className="text-sm text-ink-muted">{airline}</span>
               </label>
             ))}
           </div>

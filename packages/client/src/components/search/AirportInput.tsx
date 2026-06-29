@@ -75,7 +75,7 @@ export function AirportInput({ value, onChange, placeholder = 'Airport', label }
 
   return (
     <div ref={containerRef} className="relative">
-      {label && <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>}
+      {label && <label className="block text-sm font-medium text-ink-muted mb-1">{label}</label>}
       <input
         type="text"
         value={query}
@@ -86,24 +86,24 @@ export function AirportInput({ value, onChange, placeholder = 'Airport', label }
         className={`input-field ${showError ? 'border-red-400 ring-1 ring-red-400' : ''}`}
       />
       {showError && (
-        <p className="text-xs text-red-500 mt-1">Select an airport from the list</p>
+        <p className="text-xs text-red-400 mt-1">Select an airport from the list</p>
       )}
       {open && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+        <div className="absolute z-50 w-full mt-1 bg-surface-3 border border-hairline-strong rounded-lg max-h-56 overflow-y-auto animate-fadeInUp" style={{ animationDuration: '0.15s' }}>
           {(results.length > 0 ? results : (query.length === 0 ? AIRPORTS.slice(0, 15) : [])).map((airport) => (
             <button
               key={airport.code}
               type="button"
-              className="w-full text-left px-4 py-2.5 hover:bg-gray-50 border-b border-gray-50 last:border-0"
+              className="w-full text-left px-4 py-2.5 hover:bg-white/5 border-b border-hairline last:border-0 transition-colors duration-100"
               onClick={() => selectAirport(airport)}
             >
-              <span className="font-mono font-bold text-brand-700 mr-2">{airport.code}</span>
-              <span className="text-sm text-gray-700">{airport.city}</span>
-              <span className="text-xs text-gray-400 ml-1">· {airport.name}</span>
+              <span className="font-mono font-bold text-brand-400 mr-2">{airport.code}</span>
+              <span className="text-sm text-ink-muted">{airport.city}</span>
+              <span className="text-xs text-ink-faint ml-1">· {airport.name}</span>
             </button>
           ))}
           {query.length >= 1 && results.length === 0 && (
-            <div className="px-4 py-3 text-sm text-gray-500">No airports found for "{query}"</div>
+            <div className="px-4 py-3 text-sm text-ink-faint">No airports found for "{query}"</div>
           )}
         </div>
       )}

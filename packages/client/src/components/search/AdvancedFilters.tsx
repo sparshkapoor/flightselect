@@ -34,10 +34,10 @@ export function AdvancedFilters({
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="border-t border-gray-100 pt-3">
+    <div className="border-t border-hairline pt-3">
       <button
         type="button"
-        className="flex items-center gap-2 text-sm font-medium text-brand-600 hover:text-brand-700"
+        className="flex items-center gap-2 text-sm font-medium text-brand-400 hover:text-brand-300"
         onClick={() => setExpanded(!expanded)}
       >
         <span>{expanded ? '▾' : '▸'}</span>
@@ -45,19 +45,19 @@ export function AdvancedFilters({
       </button>
 
       {expanded && (
-        <div className="mt-4 space-y-4">
+        <div className="mt-4 space-y-4 animate-fadeInUp" style={{ animationDuration: '0.3s' }}>
           {/* Max Layovers */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Max Layovers</label>
+            <label className="text-eyebrow text-ink-subtle mb-2 block">Max Layovers</label>
             <div className="flex gap-2">
               {[undefined, 0, 1, 2].map((v) => (
                 <button
                   key={String(v)}
                   type="button"
-                  className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+                  className={`px-3 py-1.5 rounded-lg text-sm border transition-all duration-150 ${
                     maxLayovers === v
                       ? 'bg-brand-600 text-white border-brand-600'
-                      : 'bg-white text-gray-700 border-gray-300 hover:border-brand-400'
+                      : 'bg-surface-1 text-ink-subtle border-hairline hover:border-brand-400'
                   }`}
                   onClick={() => onMaxLayoversChange(v)}
                 >
@@ -74,9 +74,9 @@ export function AdvancedFilters({
               type="checkbox"
               checked={flexibleDates}
               onChange={(e) => onFlexibleDatesChange(e.target.checked)}
-              className="rounded"
+              className="rounded accent-brand-600"
             />
-            <label htmlFor="flexDates" className="text-sm font-medium text-gray-700">
+            <label htmlFor="flexDates" className="text-sm font-medium text-ink-muted">
               Flexible dates
             </label>
             {flexibleDates && (
@@ -96,7 +96,7 @@ export function AdvancedFilters({
 
           {/* Preferred airlines */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Preferred Airlines</label>
+            <label className="text-eyebrow text-ink-subtle mb-2 block">Preferred Airlines</label>
             <div className="flex flex-wrap gap-2">
               {AIRLINES.map((a) => (
                 <button
@@ -109,10 +109,10 @@ export function AdvancedFilters({
                         : [...preferredAirlines, a]
                     )
                   }
-                  className={`px-2 py-1 rounded text-xs border transition-colors ${
+                  className={`px-2 py-1 rounded text-xs border transition-all duration-150 ${
                     preferredAirlines.includes(a)
                       ? 'bg-brand-600 text-white border-brand-600'
-                      : 'bg-white text-gray-600 border-gray-300 hover:border-brand-400'
+                      : 'bg-surface-1 text-ink-subtle border-hairline hover:border-brand-400'
                   }`}
                 >
                   {a}
@@ -123,7 +123,7 @@ export function AdvancedFilters({
 
           {/* Avoided airlines */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Avoid Airlines</label>
+            <label className="text-eyebrow text-ink-subtle mb-2 block">Avoid Airlines</label>
             <div className="flex flex-wrap gap-2">
               {AIRLINES.map((a) => (
                 <button
@@ -136,10 +136,10 @@ export function AdvancedFilters({
                         : [...avoidedAirlines, a]
                     )
                   }
-                  className={`px-2 py-1 rounded text-xs border transition-colors ${
+                  className={`px-2 py-1 rounded text-xs border transition-all duration-150 ${
                     avoidedAirlines.includes(a)
                       ? 'bg-red-500 text-white border-red-500'
-                      : 'bg-white text-gray-600 border-gray-300 hover:border-red-300'
+                      : 'bg-surface-1 text-ink-subtle border-hairline hover:border-red-500/50'
                   }`}
                 >
                   {a}

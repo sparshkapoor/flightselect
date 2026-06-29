@@ -132,12 +132,12 @@ export function SearchResultsPage() {
           <LoadingSpinner size="lg" label="Searching for flights..." />
         </div>
       ) : searchDone && allFlights.length === 0 && !flightsLoading && !flightsFetching ? (
-        <div className="flex flex-col items-center justify-center py-24 text-gray-500">
+        <div className="flex flex-col items-center justify-center py-24 text-ink-cool">
           <div className="text-4xl mb-4">No flights found</div>
           <p className="text-lg">Try adjusting your search — different dates, airports, or fewer filters.</p>
         </div>
       ) : (
-        <div className="flex gap-6">
+        <div className="flex gap-6 items-start">
           <FilterSidebar flights={outboundFlights} />
           <div className="flex-1 space-y-8">
             {isComparisonLoading ? (
@@ -161,13 +161,13 @@ export function SearchResultsPage() {
 
             {/* Sort + count bar */}
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-ink-cool">
                 {filteredAndSortedFlights.length} of {outboundFlights.length} flights
               </span>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortOption)}
-                className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                className="text-sm border border-hairline rounded-lg px-3 py-1.5 bg-surface-1 text-ink focus:outline-none focus:ring-2 focus:ring-brand-500/50"
               >
                 <option value="price_asc">Price: Low to High</option>
                 <option value="price_desc">Price: High to Low</option>
@@ -184,7 +184,7 @@ export function SearchResultsPage() {
             {isRoundTrip && returnFlights.length > 0 && (
               <>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">
+                  <span className="text-sm text-ink-cool">
                     {filteredAndSortedReturnFlights.length} of {returnFlights.length} return flights
                   </span>
                 </div>

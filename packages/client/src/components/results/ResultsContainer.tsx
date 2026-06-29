@@ -29,10 +29,12 @@ export function ResultsContainer({ flights, isLoading, title }: ResultsContainer
 
   return (
     <div>
-      {title && <h2 className="text-lg font-semibold text-gray-800 mb-3">{title}</h2>}
+      {title && <h2 className="text-h2 text-[1rem] text-ink-muted mb-3">{title}</h2>}
       <div className="space-y-3">
-        {flights.map((flight) => (
-          <FlightCard key={flight.id} flight={flight} />
+        {flights.map((flight, i) => (
+          <div key={flight.id} className="animate-fadeInUp" style={{ animationDelay: `${Math.min(i * 40, 320)}ms` }}>
+            <FlightCard flight={flight} />
+          </div>
         ))}
       </div>
     </div>

@@ -70,59 +70,65 @@ export function ComparisonView({
 
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-900">Your Trip</h2>
+        <div className="flex items-center justify-between animate-fadeInUp">
+          <h2 className="text-h1 text-ink">Your Trip</h2>
         </div>
 
         {origin && destination && (
-          <AIInsightCard comparison={comparison} origin={origin} destination={destination} />
+          <div className="animate-fadeInUp" style={{ animationDelay: '60ms' }}>
+            <AIInsightCard comparison={comparison} origin={origin} destination={destination} />
+          </div>
         )}
 
-        <RoundTripBundle
-          outboundFlight={bestOutbound}
-          returnFlight={null}
-          totalPrice={Number(comparison.oneWayTotalPrice)}
-          isCheapest={false}
-          savingsAmount={null}
-          combinedBookingUrl={null}
-          outboundOptions={optionsFor(bestOutbound.id)}
-          returnOptions={null}
-          optionsLoading={optionsLoading}
-        />
+        <div className="animate-fadeInUp" style={{ animationDelay: '120ms' }}>
+          <RoundTripBundle
+            outboundFlight={bestOutbound}
+            returnFlight={null}
+            totalPrice={Number(comparison.oneWayTotalPrice)}
+            isCheapest={false}
+            savingsAmount={null}
+            combinedBookingUrl={null}
+            outboundOptions={optionsFor(bestOutbound.id)}
+            returnOptions={null}
+            optionsLoading={optionsLoading}
+          />
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Your Trip</h2>
+      <div className="flex items-center justify-between animate-fadeInUp">
+        <h2 className="text-h1 text-ink">Your Trip</h2>
       </div>
 
       {origin && destination && (
-        <AIInsightCard comparison={comparison} origin={origin} destination={destination} />
+        <div className="animate-fadeInUp" style={{ animationDelay: '60ms' }}>
+          <AIInsightCard comparison={comparison} origin={origin} destination={destination} />
+        </div>
       )}
 
-      <RoundTripBundle
-        outboundFlight={rtOutbound}
-        returnFlight={rtReturn}
-        totalPrice={Number(comparison.roundTripTotalPrice)}
-        isCheapest={isRoundTripCheapest}
-        savingsAmount={savingsAmount}
-        combinedBookingUrl={combinedBookingUrl}
-        outboundOptions={optionsFor(rtOutbound.id)}
-        returnOptions={optionsFor(rtReturn.id)}
-        optionsLoading={optionsLoading}
-      />
+      <div className="animate-fadeInUp" style={{ animationDelay: '120ms' }}>
+        <RoundTripBundle
+          outboundFlight={rtOutbound}
+          returnFlight={rtReturn}
+          totalPrice={Number(comparison.roundTripTotalPrice)}
+          isCheapest={isRoundTripCheapest}
+          savingsAmount={savingsAmount}
+          combinedBookingUrl={combinedBookingUrl}
+          outboundOptions={optionsFor(rtOutbound.id)}
+          returnOptions={optionsFor(rtReturn.id)}
+          optionsLoading={optionsLoading}
+        />
+      </div>
 
       {oneWayOutboundFlights[0] && oneWayReturnFlights[0] && (
-        <>
+        <div className="animate-fadeInUp" style={{ animationDelay: '180ms' }}>
           <div className="flex items-center gap-3 my-10">
-            <div className="flex-1 h-px bg-gray-200" />
-            <span className="text-xs font-medium text-gray-400 uppercase tracking-wide shrink-0">
-              or mix airlines
-            </span>
-            <div className="flex-1 h-px bg-gray-200" />
+            <div className="flex-1 h-px bg-hairline" />
+            <span className="text-eyebrow text-ink-faint shrink-0">or mix airlines</span>
+            <div className="flex-1 h-px bg-hairline" />
           </div>
 
           <MixAndMatchSection
@@ -135,23 +141,32 @@ export function ComparisonView({
             returnOptions={optionsFor(oneWayReturnFlights[0].id)}
             optionsLoading={optionsLoading}
           />
-        </>
+        </div>
       )}
 
-      <details className="border-t border-gray-200 pt-6">
-        <summary className="text-sm font-semibold text-gray-500 uppercase tracking-wide cursor-pointer">
+      <details className="group border-t border-hairline pt-6">
+        <summary className="flex items-center gap-2 text-eyebrow text-ink-subtle hover:text-ink-muted cursor-pointer list-none transition-colors duration-150">
+          <svg
+            className="w-3.5 h-3.5 shrink-0 transition-transform duration-200 group-open:rotate-90"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2.5}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
           See full price breakdown
         </summary>
-        <div className="mt-4 space-y-6">
+        <div className="mt-4 space-y-6 bg-surface-1 border border-hairline rounded-xl p-5">
           <div>
-            <h3 className="font-semibold text-gray-700 mb-3">Price Comparison</h3>
+            <h3 className="text-h2 text-[1rem] text-ink-muted mb-3">Price Comparison</h3>
             <PriceComparisonChart
               roundTripTotal={Number(comparison.roundTripTotalPrice)}
               oneWayTotal={Number(comparison.oneWayTotalPrice)}
             />
           </div>
           <div>
-            <h3 className="font-semibold text-gray-700 mb-3">Detailed Comparison</h3>
+            <h3 className="text-h2 text-[1rem] text-ink-muted mb-3">Detailed Comparison</h3>
             <ComparisonTable
               roundTripFlights={roundTripFlights}
               oneWayOutboundFlights={oneWayOutboundFlights}

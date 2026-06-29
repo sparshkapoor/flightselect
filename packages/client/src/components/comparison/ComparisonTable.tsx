@@ -58,7 +58,7 @@ export function ComparisonTable({
   return (
     <table className="w-full text-sm">
       <thead>
-        <tr className="text-xs uppercase text-gray-400 border-b">
+        <tr className="text-eyebrow text-ink-subtle border-b border-hairline">
           <th className="text-left py-2">Attribute</th>
           <th className="text-center py-2">Same Airline</th>
           <th className="text-center py-2">Best Mix</th>
@@ -66,10 +66,10 @@ export function ComparisonTable({
       </thead>
       <tbody>
         {rows.map((row) => (
-          <tr key={row.label} className={`border-b ${row.highlight ? 'font-semibold' : ''}`}>
-            <td className="py-2 text-gray-600">{row.label}</td>
-            <td className="py-2 text-center">{row.rt}</td>
-            <td className="py-2 text-center">{row.ow}</td>
+          <tr key={row.label} className={`border-b border-hairline ${row.highlight ? 'font-semibold' : ''}`}>
+            <td className="py-2 text-ink-cool">{row.label}</td>
+            <td className="py-2 text-center font-mono text-ink-muted">{row.rt}</td>
+            <td className="py-2 text-center font-mono text-ink-muted">{row.ow}</td>
           </tr>
         ))}
       </tbody>

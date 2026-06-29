@@ -116,6 +116,13 @@ describe('buildGoogleFlightsTfsUrl', () => {
     expect(decoded).toContain('2026-06-17');
     expect(decoded).toContain('UA');
     expect(decoded).toContain('1343');
+
+    // Trip type is field 19 (varint), not field 2 — both trip types set
+    // field 2 = 2. One-way must end with field19=2 (hex 980102), proving
+    // it doesn't accidentally trigger Google's "choose your return" step.
+    const hex = Buffer.from(tfs, 'base64url').toString('hex');
+    expect(hex).toContain('081c1002');
+    expect(hex).toContain('980102');
   });
 });
 
@@ -187,7 +194,11 @@ describe('buildGoogleFlightsTfsUrlFromSegments', () => {
     // Our tfs wraps the same leg bytes in the top-level message (field 1/2 header
     // then field 3 = leg, then trailing fields) — assert the leg bytes appear
     // verbatim, proving the segment encoding itself is byte-identical to Google's.
-    expect(decoded.toString('hex')).toContain(googleLegHex);
+    const hex = decoded.toString('hex');
+    expect(hex).toContain(googleLegHex);
+
+    // This is the one-way builder — trip type (field 19) must be 2, not 1.
+    expect(hex).toContain('980102');
   });
 });
 
@@ -216,11 +227,16 @@ describe('buildGoogleFlightsRoundTripTfsUrl', () => {
     const hex = decoded.toString('hex');
     const binary = decoded.toString('binary');
 
-    // field 1 = 28 (081c) immediately followed by field 2 = 1 / round trip
-    // (1001) — not field 2 = 2 / one-way (1002), proving this didn't silently
-    // fall back to the one-way encoding.
-    expect(hex).toContain('081c1001');
-    expect(hex).not.toContain('081c1002');
+    // field 1 = 28, field 2 = 2 (081c1002) on BOTH trip types — verified
+    // against real Google-issued one-way and round-trip URLs the user
+    // captured live; field 2 does NOT encode trip type.
+    expect(hex).toContain('081c1002');
+
+    // Trip type is field 19: varint(1) = round trip (980101 = tag 0x98 0x01,
+    // value 1). Proves this didn't silently fall back to the one-way
+    // encoding (which would end 980102).
+    expect(hex).toContain('980101');
+    expect(hex).not.toContain('980102');
 
     // Outbound leg bytes appear verbatim (same real Google-verified leg as above).
     expect(hex).toContain(googleLegHex);

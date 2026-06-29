@@ -15,6 +15,12 @@ function pbBytes(field: number, data: number[]): number[] {
   return [...encodeVarint((field << 3) | 2), ...encodeVarint(data.length), ...data];
 }
 
+// Field 16 "no limit" sentinel present on every real Google-issued tfs
+// (a nested message containing a max-uint64 varint at field 1). Purpose
+// unconfirmed (likely a stops/price/duration "no limit" marker) but it's
+// always present, so we emit it for parity rather than omit it.
+const NO_LIMIT_F16: number[] = [0x08, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01];
+
 // Constructs a Google Flights deep-link for a specific one-way flight.
 // tfs format reverse-engineered by the community (fast-flights, AWeirdDev/flights).
 export function buildGoogleFlightsTfsUrl(
@@ -41,12 +47,13 @@ export function buildGoogleFlightsTfsUrl(
   ];
   const tfs: number[] = [
     ...pbVarint(1, 28),
-    ...pbVarint(2, 2),   // 2 = one-way
+    ...pbVarint(2, 2),   // 2 = one-way (NOTE: this field is 2 for BOTH one-way and round-trip — trip type is field 19, see below)
     ...pbBytes(3, leg),
     ...pbVarint(8, 1),
     ...pbVarint(9, 1),
     ...pbVarint(14, 1),
-    ...pbVarint(19, 1),
+    ...pbBytes(16, NO_LIMIT_F16),
+    ...pbVarint(19, 2),  // trip type: 2 = one-way, 1 = round-trip (verified against real Google-issued URLs of both types)
   ];
   const b64 = Buffer.from(tfs).toString('base64url');
   return `https://www.google.com/travel/flights/search?tfs=${b64}&tfu=EgIIAQ&hl=en&gl=us&curr=USD`;
@@ -103,12 +110,13 @@ export function buildGoogleFlightsTfsUrlFromSegments(
   const leg = buildLegBytes(segments, overallOrigin, overallDest);
   const tfs: number[] = [
     ...pbVarint(1, 28),
-    ...pbVarint(2, 2), // one-way
+    ...pbVarint(2, 2), // 2 for both trip types — see field 19 below
     ...pbBytes(3, leg),
     ...pbVarint(8, 1),
     ...pbVarint(9, 1),
     ...pbVarint(14, 1),
-    ...pbVarint(19, 1),
+    ...pbBytes(16, NO_LIMIT_F16),
+    ...pbVarint(19, 2), // trip type: 2 = one-way
   ];
   const b64 = Buffer.from(tfs).toString('base64url');
   return `https://www.google.com/travel/flights/search?tfs=${b64}&tfu=EgIIAQ&hl=en&gl=us&curr=USD`;
@@ -117,7 +125,7 @@ export function buildGoogleFlightsTfsUrlFromSegments(
 // Round-trip deep-link built from both legs' real segment lists — the one
 // case Google Flights fully pre-selects (no "choose your return" step),
 // unlike a single-leg tfs. Same top-level message as the one-way builder,
-// but field 2 = 1 (round trip) and two repeated field-3 leg entries.
+// but field 19 = 1 (round trip) and two repeated field-3 leg entries.
 export function buildGoogleFlightsRoundTripTfsUrl(
   outboundSegments: FlightSegment[],
   outboundOrigin: string,
@@ -130,13 +138,14 @@ export function buildGoogleFlightsRoundTripTfsUrl(
   const returnLeg = buildLegBytes(returnSegments, returnOrigin, returnDest);
   const tfs: number[] = [
     ...pbVarint(1, 28),
-    ...pbVarint(2, 1), // round trip
+    ...pbVarint(2, 2), // 2 for both trip types — see field 19 below
     ...pbBytes(3, outboundLeg),
     ...pbBytes(3, returnLeg),
     ...pbVarint(8, 1),
     ...pbVarint(9, 1),
     ...pbVarint(14, 1),
-    ...pbVarint(19, 1),
+    ...pbBytes(16, NO_LIMIT_F16),
+    ...pbVarint(19, 1), // trip type: 1 = round-trip
   ];
   const b64 = Buffer.from(tfs).toString('base64url');
   return `https://www.google.com/travel/flights/search?tfs=${b64}&tfu=EgIIAQ&hl=en&gl=us&curr=USD`;

@@ -14,7 +14,7 @@ export function PriceTag({ amount, currency = 'USD', size = 'md', highlight }: P
     lg: 'text-3xl font-bold',
   };
   return (
-    <span className={`${sizeClasses[size]} ${highlight ? 'text-green-600' : 'text-gray-900'}`}>
+    <span className={`font-mono tabular-nums ${sizeClasses[size]} ${highlight ? 'text-emerald-400' : 'text-ink'}`}>
       {formatPrice(amount, currency)}
     </span>
   );

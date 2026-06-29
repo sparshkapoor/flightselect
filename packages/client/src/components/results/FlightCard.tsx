@@ -47,8 +47,8 @@ export function FlightCard({
 
   return (
     <div
-      className={`card flex items-start gap-5 px-5 py-4 cursor-pointer transition-all ${
-        selected ? 'ring-2 ring-brand-500 shadow-md' : 'hover:shadow-md hover:border-gray-300'
+      className={`card flex items-start gap-5 px-5 py-4 cursor-pointer ${
+        selected ? 'ring-2 ring-brand-500' : 'card-hover'
       }`}
       onClick={() => onSelect?.(flight)}
     >
@@ -59,10 +59,10 @@ export function FlightCard({
         >
           {airlineInitials(flight.airline)}
         </div>
-        <div className="text-xs font-semibold text-gray-700 text-center leading-tight truncate w-full">
+        <div className="text-xs font-semibold text-ink-muted text-center leading-tight truncate w-full">
           {flight.airline.split(' ')[0]}
         </div>
-        <div className="text-xs text-gray-400">{flight.flightNumber}</div>
+        <div className="text-xs font-mono text-ink-faint">{flight.flightNumber}</div>
       </div>
 
       {/* Timeline */}
@@ -80,13 +80,13 @@ export function FlightCard({
       {/* Price + actions */}
       <div className="text-right shrink-0 flex flex-col items-end gap-0.5">
         <PriceTag amount={Number(flight.price)} currency={flight.currency} />
-        <div className="text-xs text-gray-400">{CABIN_CLASS_LABELS[flight.cabinClass]} · one-way</div>
+        <div className="text-xs text-ink-faint">{CABIN_CLASS_LABELS[flight.cabinClass]} · one-way</div>
 
         {eager ? (
           <div className="mt-1.5 w-full">
             {loadingOptions ? (
               <div className="space-y-1.5">
-                <div className="h-7 bg-gray-100 rounded animate-pulse" />
+                <div className="h-7 bg-surface-2 rounded animate-pulse" />
               </div>
             ) : bookingOptions !== null && bookingOptions.length > 0 ? (
               <div className="space-y-1 text-left">
@@ -97,14 +97,14 @@ export function FlightCard({
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="block w-full text-center bg-gray-900 hover:bg-gray-800 text-white font-medium text-sm py-2 rounded-lg transition-colors duration-150"
+                    className="block w-full text-center bg-brand-600 hover:bg-brand-700 text-white font-medium text-sm py-2 rounded-lg transition-all duration-150 hover:-translate-y-px"
                   >
                     Book on {opt.seller} →
                   </a>
                 ))}
                 <button
                   onClick={handleBookingClick}
-                  className="block w-full text-center text-xs text-gray-400 hover:text-gray-600 mt-1.5 underline-offset-2 hover:underline"
+                  className="block w-full text-center text-xs text-ink-faint hover:text-ink-cool mt-1.5 underline-offset-2 hover:underline"
                 >
                   Or check Google Flights
                 </button>
@@ -112,7 +112,7 @@ export function FlightCard({
             ) : (
               <button
                 onClick={handleBookingClick}
-                className="text-xs text-brand-600 hover:text-brand-800 font-semibold hover:underline"
+                className="text-xs text-brand-400 hover:text-brand-300 font-semibold hover:underline"
               >
                 Book on Google Flights →
               </button>
@@ -121,15 +121,9 @@ export function FlightCard({
         ) : (
           <>
             <button
-              onClick={handleBookingClick}
-              className="mt-1.5 text-xs text-brand-600 hover:text-brand-800 font-semibold hover:underline"
-            >
-              Book on Google Flights →
-            </button>
-            <button
               onClick={handleViewOptions}
               disabled={loadingOptions || (bookingOptions !== null && bookingOptions.length > 0)}
-              className="mt-1 text-xs text-gray-500 hover:text-gray-700 hover:underline disabled:opacity-50"
+              className="mt-1.5 text-xs text-brand-400 hover:text-brand-300 font-semibold hover:underline disabled:opacity-50"
             >
               {loadingOptions
                 ? 'Loading...'
@@ -138,6 +132,12 @@ export function FlightCard({
                 : bookingOptions !== null && bookingOptions.length === 0
                 ? 'No sellers found'
                 : 'View booking options'}
+            </button>
+            <button
+              onClick={handleBookingClick}
+              className="mt-1 text-xs text-ink-faint hover:text-ink-cool hover:underline"
+            >
+              Or check Google Flights
             </button>
             {bookingOptions !== null && bookingOptions.length > 0 && (
               <div className="mt-1.5 space-y-1 text-left">
@@ -148,10 +148,10 @@ export function FlightCard({
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="flex justify-between items-center text-xs text-brand-700 hover:underline"
+                    className="flex justify-between items-center text-xs text-brand-400 hover:underline"
                   >
                     <span>{opt.seller}</span>
-                    <span className="ml-2 font-semibold">${opt.price}</span>
+                    <span className="ml-2 font-semibold font-mono">${opt.price}</span>
                   </a>
                 ))}
               </div>
@@ -159,7 +159,7 @@ export function FlightCard({
           </>
         )}
         {optionsError && (
-          <div className="mt-1 text-xs text-gray-400">{optionsError}</div>
+          <div className="mt-1 text-xs text-ink-faint">{optionsError}</div>
         )}
       </div>
     </div>
