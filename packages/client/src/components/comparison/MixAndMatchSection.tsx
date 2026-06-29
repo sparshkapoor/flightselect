@@ -1,5 +1,6 @@
 import type { Flight, BookingOption } from '@flightselect/shared';
 import { FlightCard } from '../results/FlightCard';
+import { formatScrapedAt } from '../../utils/formatters';
 
 interface MixAndMatchSectionProps {
   outboundFlight: Flight;
@@ -52,6 +53,11 @@ export function MixAndMatchSection({
       <p className="text-xs text-ink-faint">
         These are two separate bookings — one with each airline.
       </p>
+      {hero && (
+        <div className="text-xs text-ink-faint -mt-2">
+          Prices as of {formatScrapedAt(outboundFlight.scrapedAt)} — live prices may have changed
+        </div>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FlightCard flight={outboundFlight} mode="eager" eagerOptions={outboundOptions} eagerLoading={optionsLoading} />
         <FlightCard flight={returnFlight} mode="eager" eagerOptions={returnOptions} eagerLoading={optionsLoading} />
