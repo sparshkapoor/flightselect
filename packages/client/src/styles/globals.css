@@ -38,7 +38,7 @@
   /* Depth — surface lift + hairline border, never a shadow. See DESIGN.md
      "Depth model". */
   .btn-primary {
-    @apply bg-brand-600 hover:bg-brand-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200 hover:-translate-y-px;
+    @apply bg-brand-600 hover:bg-brand-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200 hover:-translate-y-px hover:scale-[1.015];
   }
   .btn-secondary {
     @apply bg-surface-1 hover:bg-surface-2 text-ink border border-hairline hover:border-hairline-strong font-semibold py-2 px-4 rounded-lg transition-all duration-200;
@@ -51,6 +51,13 @@
   }
   .card-hover {
     @apply hover:bg-surface-2 hover:border-hairline-strong hover:-translate-y-px;
+  }
+  /* Loading skeletons — a shimmer sweep reads as "working" more clearly than
+     a flat opacity pulse. See DESIGN.md "Motion". */
+  .skeleton {
+    @apply rounded animate-shimmer;
+    background-image: linear-gradient(90deg, #141516 25%, #23252a 50%, #141516 75%);
+    background-size: 200% 100%;
   }
 }
 

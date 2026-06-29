@@ -109,39 +109,81 @@ export function ComparisonView({
         </div>
       )}
 
-      <div className="animate-fadeInUp" style={{ animationDelay: '120ms' }}>
-        <RoundTripBundle
-          outboundFlight={rtOutbound}
-          returnFlight={rtReturn}
-          totalPrice={Number(comparison.roundTripTotalPrice)}
-          isCheapest={isRoundTripCheapest}
-          savingsAmount={savingsAmount}
-          combinedBookingUrl={combinedBookingUrl}
-          outboundOptions={optionsFor(rtOutbound.id)}
-          returnOptions={optionsFor(rtReturn.id)}
-          optionsLoading={optionsLoading}
-        />
-      </div>
-
-      {oneWayOutboundFlights[0] && oneWayReturnFlights[0] && (
-        <div className="animate-fadeInUp" style={{ animationDelay: '180ms' }}>
-          <div className="flex items-center gap-3 my-10">
-            <div className="flex-1 h-px bg-hairline" />
-            <span className="text-eyebrow text-ink-faint shrink-0">or mix airlines</span>
-            <div className="flex-1 h-px bg-hairline" />
+      {isRoundTripCheapest ? (
+        <>
+          <div className="animate-fadeInUp" style={{ animationDelay: '120ms' }}>
+            <RoundTripBundle
+              outboundFlight={rtOutbound}
+              returnFlight={rtReturn}
+              totalPrice={Number(comparison.roundTripTotalPrice)}
+              isCheapest={isRoundTripCheapest}
+              savingsAmount={savingsAmount}
+              combinedBookingUrl={combinedBookingUrl}
+              outboundOptions={optionsFor(rtOutbound.id)}
+              returnOptions={optionsFor(rtReturn.id)}
+              optionsLoading={optionsLoading}
+            />
           </div>
 
-          <MixAndMatchSection
-            outboundFlight={oneWayOutboundFlights[0]}
-            returnFlight={oneWayReturnFlights[0]}
-            totalPrice={Number(comparison.oneWayTotalPrice)}
-            isCheapest={!isRoundTripCheapest}
-            savingsAmount={savingsAmount}
-            outboundOptions={optionsFor(oneWayOutboundFlights[0].id)}
-            returnOptions={optionsFor(oneWayReturnFlights[0].id)}
-            optionsLoading={optionsLoading}
-          />
-        </div>
+          {oneWayOutboundFlights[0] && oneWayReturnFlights[0] && (
+            <div className="animate-fadeInUp" style={{ animationDelay: '180ms' }}>
+              <div className="flex items-center gap-3 my-10">
+                <div className="flex-1 h-px bg-hairline" />
+                <span className="text-eyebrow text-ink-faint shrink-0">or mix airlines</span>
+                <div className="flex-1 h-px bg-hairline" />
+              </div>
+
+              <MixAndMatchSection
+                outboundFlight={oneWayOutboundFlights[0]}
+                returnFlight={oneWayReturnFlights[0]}
+                totalPrice={Number(comparison.oneWayTotalPrice)}
+                isCheapest={!isRoundTripCheapest}
+                savingsAmount={savingsAmount}
+                outboundOptions={optionsFor(oneWayOutboundFlights[0].id)}
+                returnOptions={optionsFor(oneWayReturnFlights[0].id)}
+                optionsLoading={optionsLoading}
+              />
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          {oneWayOutboundFlights[0] && oneWayReturnFlights[0] && (
+            <div className="animate-fadeInUp" style={{ animationDelay: '120ms' }}>
+              <MixAndMatchSection
+                outboundFlight={oneWayOutboundFlights[0]}
+                returnFlight={oneWayReturnFlights[0]}
+                totalPrice={Number(comparison.oneWayTotalPrice)}
+                isCheapest={!isRoundTripCheapest}
+                savingsAmount={savingsAmount}
+                outboundOptions={optionsFor(oneWayOutboundFlights[0].id)}
+                returnOptions={optionsFor(oneWayReturnFlights[0].id)}
+                optionsLoading={optionsLoading}
+                hero
+              />
+            </div>
+          )}
+
+          <div className="animate-fadeInUp" style={{ animationDelay: '180ms' }}>
+            <div className="flex items-center gap-3 my-10">
+              <div className="flex-1 h-px bg-hairline" />
+              <span className="text-eyebrow text-ink-faint shrink-0">or same airline</span>
+              <div className="flex-1 h-px bg-hairline" />
+            </div>
+
+            <RoundTripBundle
+              outboundFlight={rtOutbound}
+              returnFlight={rtReturn}
+              totalPrice={Number(comparison.roundTripTotalPrice)}
+              isCheapest={isRoundTripCheapest}
+              savingsAmount={savingsAmount}
+              combinedBookingUrl={combinedBookingUrl}
+              outboundOptions={optionsFor(rtOutbound.id)}
+              returnOptions={optionsFor(rtReturn.id)}
+              optionsLoading={optionsLoading}
+            />
+          </div>
+        </>
       )}
 
       <details className="group border-t border-hairline pt-6">

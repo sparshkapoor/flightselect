@@ -19,7 +19,13 @@ export function SearchResultsPage() {
   const { data: comparisons, isFetching: comparisonsFetching } = useComparisons(searchQueryId ?? null);
   const filterStore = useFilterStore();
   const [sortBy, setSortBy] = useState<SortOption>('price_asc');
+  const [activeLeg, setActiveLeg] = useState<'outbound' | 'return'>('outbound');
   const preferredAirlinesApplied = useRef<string | null>(null);
+
+  // Reset to the outbound tab whenever the user lands on a new search.
+  useEffect(() => {
+    setActiveLeg('outbound');
+  }, [searchQueryId]);
 
   const allFlights: Flight[] = flightsData?.flights ?? searchData?.flights ?? [];
   const originAirport = searchData?.originAirport ?? '';
@@ -159,11 +165,32 @@ export function SearchResultsPage() {
               />
             ) : null}
 
-            {/* Sort + count bar */}
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-ink-cool">
-                {filteredAndSortedFlights.length} of {outboundFlights.length} flights
-              </span>
+            {/* Tabs (round trip only) + sort */}
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              {isRoundTrip && returnFlights.length > 0 ? (
+                <div className="inline-flex items-center gap-1 p-1 bg-surface-1 border border-hairline rounded-full">
+                  <button
+                    onClick={() => setActiveLeg('outbound')}
+                    className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors duration-150 ${
+                      activeLeg === 'outbound' ? 'bg-surface-2 text-brand-400' : 'text-ink-subtle hover:text-ink-muted'
+                    }`}
+                  >
+                    Outbound ({filteredAndSortedFlights.length})
+                  </button>
+                  <button
+                    onClick={() => setActiveLeg('return')}
+                    className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors duration-150 ${
+                      activeLeg === 'return' ? 'bg-surface-2 text-brand-400' : 'text-ink-subtle hover:text-ink-muted'
+                    }`}
+                  >
+                    Return ({filteredAndSortedReturnFlights.length})
+                  </button>
+                </div>
+              ) : (
+                <span className="text-sm text-ink-cool">
+                  {filteredAndSortedFlights.length} of {outboundFlights.length} flights
+                </span>
+              )}
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortOption)}
@@ -176,23 +203,25 @@ export function SearchResultsPage() {
               </select>
             </div>
 
-            <ResultsContainer
-              flights={filteredAndSortedFlights}
-              title={`${filteredAndSortedFlights.length} outbound flights`}
-            />
-
-            {isRoundTrip && returnFlights.length > 0 && (
-              <>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-ink-cool">
-                    {filteredAndSortedReturnFlights.length} of {returnFlights.length} return flights
-                  </span>
-                </div>
+            {isRoundTrip && returnFlights.length > 0 ? (
+              activeLeg === 'outbound' ? (
                 <ResultsContainer
+                  key="outbound"
+                  flights={filteredAndSortedFlights}
+                  title={`${filteredAndSortedFlights.length} outbound flights`}
+                />
+              ) : (
+                <ResultsContainer
+                  key="return"
                   flights={filteredAndSortedReturnFlights}
                   title={`${filteredAndSortedReturnFlights.length} return flights`}
                 />
-              </>
+              )
+            ) : (
+              <ResultsContainer
+                flights={filteredAndSortedFlights}
+                title={`${filteredAndSortedFlights.length} outbound flights`}
+              />
             )}
           </div>
         </div>

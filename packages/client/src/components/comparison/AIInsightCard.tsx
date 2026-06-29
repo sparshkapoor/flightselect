@@ -61,8 +61,8 @@ export function AIInsightCard({ comparison, origin, destination }: AIInsightCard
         <span className="text-eyebrow text-brand-400">AI Insight</span>
         {state === 'loading' ? (
           <div className="mt-1.5 space-y-1.5">
-            <div className="h-3 bg-surface-2 rounded animate-pulse w-full" />
-            <div className="h-3 bg-surface-2 rounded animate-pulse w-3/4" />
+            <div className="h-3 skeleton w-full" />
+            <div className="h-3 skeleton w-3/4" />
           </div>
         ) : (
           <p className="text-sm text-ink-muted mt-0.5 leading-snug animate-fadeInUp">{insight}</p>

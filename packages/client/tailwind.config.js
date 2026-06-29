@@ -45,10 +45,15 @@ export default {
           '0%, 100%': { transform: 'translate(0, 0) scale(1)', opacity: '0.18' },
           '50%': { transform: 'translate(140px, -90px) scale(1.25)', opacity: '0.32' },
         },
+        shimmer: {
+          '0%': { backgroundPosition: '-200% 0' },
+          '100%': { backgroundPosition: '200% 0' },
+        },
       },
       animation: {
         fadeInUp: 'fadeInUp 0.5s ease-out both',
         ambientDrift: 'ambientDrift 16s ease-in-out infinite',
+        shimmer: 'shimmer 1.6s ease-in-out infinite',
       },
     },
   },

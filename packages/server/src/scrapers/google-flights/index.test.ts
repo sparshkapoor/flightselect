@@ -93,6 +93,42 @@ describe('normalizeFlight', () => {
   });
 });
 
+describe('normalizeFlight timezone handling', () => {
+  // SerpAPI sends airport-LOCAL wall-clock time with no timezone marker, in
+  // either "YYYY-MM-DD HH:MM" (real API) or "YYYY-MM-DDTHH:MM:SS" (this repo's
+  // mocks) form. Regardless of the machine running this test, the parsed
+  // result must reproduce the exact same digits via getUTC*() — proving the
+  // server-timezone-dependent bug (`new Date(localString)`) is gone.
+  const spaceFormatResult = {
+    price: 500,
+    flights: [{
+      departure_airport: { id: 'EWR', name: 'EWR', time: '2026-07-02 17:00' },
+      arrival_airport: { id: 'SFO', name: 'SFO', time: '2026-07-02 20:35' },
+      duration: 335,
+      airline: 'United',
+      flight_number: 'UA100',
+    }],
+    total_duration: 335,
+  };
+
+  it('preserves SerpAPI\'s space-separated local wall-clock digits via getUTC*()', () => {
+    const result = normalizeFlight(spaceFormatResult as any, 1, CabinClass.ECONOMY, '2026-07-02');
+    expect(result.departureTime.getUTCHours()).toBe(17);
+    expect(result.departureTime.getUTCMinutes()).toBe(0);
+    expect(result.arrivalTime.getUTCHours()).toBe(20);
+    expect(result.arrivalTime.getUTCMinutes()).toBe(35);
+  });
+
+  it('preserves the T-separated mock format the same way', () => {
+    const result = normalizeFlight(directResult as any, 1, CabinClass.ECONOMY, '2024-06-01');
+    // seg('JFK', 'LAX', ...) departs JFK at "08:00", arrives LAX at "14:00"
+    expect(result.departureTime.getUTCHours()).toBe(8);
+    expect(result.departureTime.getUTCMinutes()).toBe(0);
+    expect(result.arrivalTime.getUTCHours()).toBe(14);
+    expect(result.arrivalTime.getUTCMinutes()).toBe(0);
+  });
+});
+
 describe('buildGoogleFlightsUrl', () => {
   it('produces a one-way search URL with no return date', () => {
     const url = buildGoogleFlightsUrl('JFK', 'LAX', '2024-06-01');

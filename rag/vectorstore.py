@@ -10,6 +10,12 @@ def _collection() -> chromadb.Collection:
     return client.get_or_create_collection(config.COLLECTION_NAME)
 
 
+# Chroma rejects a single add() above this size (its own max_batch_size,
+# observed at 5461) — chunk so callers can pass arbitrarily large ingests
+# (e.g. the DOT BTS seed, tens of thousands of rows) without knowing this.
+_MAX_BATCH_SIZE = 5000
+
+
 def ingest(
     documents: list[str],
     embeddings: list[list[float]],
@@ -22,13 +28,16 @@ def ingest(
     if len(documents) != len(embeddings) or len(documents) != len(ids):
         raise ValueError("documents, embeddings, and ids must have the same length")
 
+    metadatas = metadatas or [{} for _ in documents]
     col = _collection()
-    col.add(
-        documents=documents,
-        embeddings=embeddings,
-        ids=ids,
-        metadatas=metadatas or [{} for _ in documents],
-    )
+    for start in range(0, len(documents), _MAX_BATCH_SIZE):
+        end = start + _MAX_BATCH_SIZE
+        col.add(
+            documents=documents[start:end],
+            embeddings=embeddings[start:end],
+            ids=ids[start:end],
+            metadatas=metadatas[start:end],
+        )
     logger.info("Wrote %d documents to collection '%s'", len(documents), config.COLLECTION_NAME)
 
 

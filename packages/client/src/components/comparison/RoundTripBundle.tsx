@@ -1,7 +1,7 @@
 import type { Flight, BookingOption } from '@flightselect/shared';
 import { FlightTimeline } from '../results/FlightTimeline';
 import { airlineInitials, airlineColor } from '../../utils/airlineBadge';
-import { formatPriceDifference } from '../../utils/formatters';
+import { formatPriceDifference, formatScrapedAt } from '../../utils/formatters';
 
 interface RoundTripBundleProps {
   outboundFlight: Flight;
@@ -49,7 +49,7 @@ function LegRow({ flight, direction, options, loading }: LegRowProps) {
           ${Number(flight.price).toFixed(0)}
         </span>
         {loading ? (
-          <div className="h-3 w-20 bg-surface-2 rounded animate-pulse mt-0.5" />
+          <div className="h-3 w-20 skeleton mt-0.5" />
         ) : topOption ? (
           <a
             href={topOption.url}
@@ -116,7 +116,7 @@ export function RoundTripBundle({
       </div>
 
       {/* Price + savings row */}
-      <div className="flex items-baseline justify-between gap-4 mb-6">
+      <div className="flex items-baseline justify-between gap-4 mb-1">
         <span className="text-display tabular-nums text-ink">${totalPrice.toFixed(0)}</span>
         {returnFlight && isCheapest && savingsAmount !== null && savingsAmount > 0 && (
           <span className="inline-flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 text-xs font-semibold px-3 py-1.5 rounded-full border border-emerald-500/20">
@@ -128,6 +128,9 @@ export function RoundTripBundle({
             Mixing airlines saves {formatPriceDifference(savingsAmount)} — see below
           </span>
         )}
+      </div>
+      <div className="text-xs text-ink-faint mb-6">
+        Prices as of {formatScrapedAt(outboundFlight.scrapedAt)} — live prices may have changed
       </div>
 
       {/* Legs */}
@@ -153,7 +156,7 @@ export function RoundTripBundle({
           <button
             onClick={() => combinedBookingUrl && window.open(combinedBookingUrl, '_blank', 'noopener,noreferrer')}
             disabled={!combinedBookingUrl}
-            className="w-full bg-brand-600 hover:bg-brand-700 active:bg-brand-700 text-white font-semibold text-sm py-2.5 px-4 rounded-lg transition-all duration-150 hover:-translate-y-px mt-2 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+            className="w-full bg-brand-600 hover:bg-brand-700 active:bg-brand-700 text-white font-semibold text-sm py-2.5 px-4 rounded-lg transition-all duration-150 hover:-translate-y-px hover:scale-[1.015] mt-2 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:scale-100"
           >
             Book round trip on Google Flights →
           </button>

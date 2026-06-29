@@ -83,12 +83,11 @@ export function FlightCard({
         <div className="text-xs text-ink-faint">{CABIN_CLASS_LABELS[flight.cabinClass]} · one-way</div>
 
         {eager ? (
-          <div className="mt-1.5 w-full">
-            {loadingOptions ? (
-              <div className="space-y-1.5">
-                <div className="h-7 bg-surface-2 rounded animate-pulse" />
-              </div>
-            ) : bookingOptions !== null && bookingOptions.length > 0 ? (
+          <div className="mt-1.5 w-full space-y-1.5">
+            {/* Skeleton for the still-loading seller options — never gates the
+                Google Flights link below, which is available immediately. */}
+            {loadingOptions && <div className="h-7 skeleton" />}
+            {!loadingOptions && bookingOptions !== null && bookingOptions.length > 0 && (
               <div className="space-y-1 text-left">
                 {bookingOptions.map((opt, i) => (
                   <a
@@ -97,18 +96,20 @@ export function FlightCard({
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="block w-full text-center bg-brand-600 hover:bg-brand-700 text-white font-medium text-sm py-2 rounded-lg transition-all duration-150 hover:-translate-y-px"
+                    className="block w-full text-center bg-brand-600 hover:bg-brand-700 text-white font-medium text-sm py-2 rounded-lg transition-all duration-150 hover:-translate-y-px hover:scale-[1.015]"
                   >
                     Book on {opt.seller} →
                   </a>
                 ))}
-                <button
-                  onClick={handleBookingClick}
-                  className="block w-full text-center text-xs text-ink-faint hover:text-ink-cool mt-1.5 underline-offset-2 hover:underline"
-                >
-                  Or check Google Flights
-                </button>
               </div>
+            )}
+            {!loadingOptions && bookingOptions !== null && bookingOptions.length > 0 ? (
+              <button
+                onClick={handleBookingClick}
+                className="block w-full text-center text-xs text-ink-faint hover:text-ink-cool underline-offset-2 hover:underline"
+              >
+                Or check Google Flights
+              </button>
             ) : (
               <button
                 onClick={handleBookingClick}

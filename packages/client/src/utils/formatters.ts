@@ -34,3 +34,15 @@ export function formatPriceDifference(diff: number): string {
   const abs = Math.abs(diff);
   return `$${abs.toFixed(0)}`;
 }
+
+// Unlike flight departure/arrival times, scrapedAt is a real instant (when we
+// hit SerpAPI), not a naive airport-local label — format it in the viewer's
+// own timezone, the normal way.
+export function formatScrapedAt(dateStr: string): string {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(dateStr));
+}

@@ -52,9 +52,16 @@ FlightSelect's UI has drifted from its stated design intent more than once — a
 | 1 — lifted | `bg-surface-1 border border-hairline rounded-xl` | Default cards: flight rows, filter panel, AI insight |
 | 2 — elevated | `bg-surface-2 border border-hairline-strong` | Hover state, the recommended/winning option, featured panels |
 | 3 — popover | `bg-surface-3` | Airport autocomplete dropdown, any floating menu |
+| sticky chrome | `bg-canvas/80 backdrop-blur-md` + hairline border | **Only** the sticky `Header` — see "On backdrop-blur" below |
 | focus | `ring-2 ring-brand-500/50` | Focused input/button — the only place a glow-like effect is allowed |
 
 No `shadow-*` utility appears anywhere in this app. Depth is surface + border, full stop.
+
+### On backdrop-blur (researched, not a reversal of "no glass")
+
+We looked into an Apple-style "liquid glass" treatment for cards and rejected it on two independent grounds: (1) true refraction (SVG `feDisplacementMap` as `backdrop-filter`) is Chromium-only — it breaks in Safari/Firefox and fails text contrast, and this app is almost entirely text; (2) reading the design systems of the brands this app is actually modeled on (Linear, Raycast, Runway, and Apple itself) showed **zero glass on content cards** — depth there is carried entirely by the surface ladder + hairline, exactly what this file already specifies. Even Apple, who invented the effect, restricts `backdrop-filter: blur` on the web to functional sticky chrome (`sub-nav-frosted`, floating buy bar) — never a card.
+
+So the rule stays **no glass on cards, rows, or the hero** — that's not changing. The one addition: `backdrop-blur-md` on the sticky `Header` only, matching Apple's own "frosted nav floating over scrolling content" usage. It's functional (keeps nav legible over content scrolling beneath it), not decorative, confined to one surface, and degrades gracefully to opaque `bg-canvas` in browsers without `backdrop-filter` support.
 
 ## Typography (exact classes, defined once in `globals.css`)
 
@@ -72,7 +79,11 @@ Negative tracking is mandatory on `.text-display`/`.text-h1`/`.text-h2` — flat
 
 ## Component anatomy (not just recoloring)
 
-**Comparison hero (`RoundTripBundle.tsx`) — the protagonist of the whole app.** Anatomy, top to bottom: eyebrow (accent-tinted only when this option is the recommended one) → airline chip + name → **`.text-display` price**, tabular-nums → leg rows in `font-mono` for codes/numbers, plain Inter for everything else → connector glyph between legs → CTA. The CTA is `rounded-lg` (md, 8px), `bg-brand-600 hover:bg-brand-700`, normal button width (NOT a full-bleed neon slab), with a 1px `-translate-y-px` lift on hover — confident, not shouting. When this option is the recommended/cheapest one, the whole card steps up to depth level 2 (`surface-2` + `hairline-strong`) — the surface lift IS the "you should pick this" signal, no extra badge needed beyond the existing savings pill.
+**Comparison hero (`RoundTripBundle.tsx`) — the protagonist of the whole app.** Anatomy, top to bottom: eyebrow (accent-tinted only when this option is the recommended one) → airline chip + name → **`.text-display` price** + a small `text-ink-faint` "Prices as of {scrapedAt}" caption (snapshot honesty — a tfs deep-link always shows live times/price, our card is a point-in-time scrape) → leg rows in `font-mono` for codes/numbers, plain Inter for everything else → connector glyph between legs → CTA. The CTA is `rounded-lg` (md, 8px), `bg-brand-600 hover:bg-brand-700`, normal button width (NOT a full-bleed neon slab), with a 1px `-translate-y-px` lift plus a `scale-[1.015]` micro-scale on hover — confident, not shouting. When this option is the recommended/cheapest one, the whole card steps up to depth level 2 (`surface-2` + `hairline-strong`) — the surface lift IS the "you should pick this" signal, no extra badge needed beyond the existing savings pill.
+
+**Whichever option is cheaper leads.** `ComparisonView.tsx` swaps which component renders first based on `comparison.recommendedOption` — when mixing airlines is cheaper, `MixAndMatchSection` takes the same surface-2 hero treatment (`hero` prop: `.text-display` price, accent eyebrow, surface-2 panel) and `RoundTripBundle` demotes below an "or same airline" divider; never always-same-airline-first.
+
+**Tabs** (`SearchResultsPage.tsx`, Outbound/Return — round trips only): a segmented pill control, `surface-1` track (`bg-surface-1 border border-hairline rounded-full p-1`), each tab `rounded-full px-4 py-1.5`, active tab `bg-surface-2 text-brand-400`, inactive `text-ink-subtle hover:text-ink-muted`. Same surface-ladder-as-signal logic as the recommended hero — no separate "active" color, just the established surface step.
 
 **Disclosures** (`<details>` "See full price breakdown"): never bare browser-default styling. Always: hairline top border, an eyebrow-styled `<summary>`, a chevron that rotates 90° on `[open]`, and the opened content sitting in its own `surface-1` panel with padding — not flush against the page.
 
@@ -88,6 +99,8 @@ A previous pass shipped "ambient blobs" that moved under 40px on a 384px blurred
 
 - **Entrance**: every page — landing AND the search results page, which previously had zero animation — gets a staggered `fadeInUp` (defined in `tailwind.config.js`) on its top-level sections/cards: hero → AI insight → flight rows, ~60ms stagger between siblings.
 - **Hover**: `transition-all duration-200`, surface-1→surface-2, hairline→hairline-strong, `-translate-y-px`. Never a shadow.
+- **CTA hover micro-scale**: primary buttons (`.btn-primary`, the round-trip combined CTA, the eager-mode seller buttons) pair the existing `-translate-y-px` lift with `hover:scale-[1.015]` — a deliberately small scale, just enough to read as "responsive" without "shouting" (DESIGN's own bar for CTAs).
+- **Skeleton shimmer**: loading placeholders (`.skeleton` in `globals.css`) sweep a hairline-toned highlight left-to-right (`animate-shimmer`, defined in `tailwind.config.js`) instead of a flat opacity pulse — reads more clearly as "working."
 - **Landing ambient**: one large, slow-drifting low-opacity accent glow with real travel distance (100px+) and a slow opacity pulse, plus a faint static engineered grid texture behind it (no motion needed on the grid — its job is texture, not animation).
 - **Respect `prefers-reduced-motion: reduce`** — disable all animation/transition duration globally when set. This is in `globals.css`, not per-component.
 
@@ -103,4 +116,4 @@ A previous pass shipped "ambient blobs" that moved under 40px on a 384px blurred
 
 **Do**: use the accent often (3+ places per screen); lift surfaces for hierarchy; use `font-mono` for every flight number/code/duration; make motion big enough to see; keep CTAs `rounded-lg`, never pill.
 
-**Don't**: use `shadow-*` anywhere; use glassmorphism/backdrop-blur as a primary effect; use more than one accent hue; let any container stretch to a height its content doesn't need; ship an animation under ~80px of travel or 0.05 opacity delta and call it "ambient motion."
+**Don't**: use `shadow-*` anywhere; use glassmorphism/backdrop-blur on any card, row, or the hero (the one sanctioned exception is the sticky `Header`, see "On backdrop-blur" above); use more than one accent hue; let any container stretch to a height its content doesn't need; ship an animation under ~80px of travel or 0.05 opacity delta and call it "ambient motion."

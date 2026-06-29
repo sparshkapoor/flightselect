@@ -247,6 +247,17 @@ psql "$DATABASE_URL" -c "\COPY (
 python -m rag.ingest data/flights/flights.csv
 ```
 
+## Seeding real historical fares (one-time)
+
+Routes with no search history return "insufficient data" for the AI insight until enough organic searches accumulate. To bootstrap immediate coverage for major US routes with real (not synthetic) data, seed from the US DOT BTS Consumer Airfare Report:
+
+```bash
+python -m rag.seed_dot_airfares          # fetches DOT BTS Table 1a -> data/flights/dot_airfares.csv
+python -m rag.ingest data/flights/dot_airfares.csv
+```
+
+This covers ~1,000 US contiguous-state metro city-pairs with real multi-year quarterly average fares (`rag/seed_dot_airfares.py` maps the dataset's metro-area names to IATA codes). International routes aren't in this public dataset and still rely on organic per-search ingestion.
+
 ---
 
 ## License

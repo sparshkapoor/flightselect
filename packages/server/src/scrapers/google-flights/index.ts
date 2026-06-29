@@ -53,6 +53,23 @@ function formatDate(date: Date | string): string {
   return date.toISOString().split('T')[0];
 }
 
+// SerpAPI's airport times (e.g. "2026-07-02 17:00" or "2026-07-02T17:00:00") are
+// the airport-LOCAL wall clock with no timezone attached. `new Date(s)` would
+// apply the parsing environment's own timezone offset to those digits, which is
+// wrong on any non-UTC server. We instead pin the literal Y/M/D/H/M digits to
+// UTC, so they pass through unchanged end-to-end and `formatTime`'s
+// `getUTCHours()` (see formatters.ts) reproduces the true airport-local time
+// regardless of what timezone the server runs in.
+function parseAirportLocalTime(s: string): Date {
+  const match = s.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+  if (!match) {
+    logger.warn(`parseAirportLocalTime: unrecognized time format "${s}" — falling back to native Date parsing`);
+    return new Date(s);
+  }
+  const [, year, month, day, hour, minute] = match;
+  return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute)));
+}
+
 export { buildGoogleFlightsTfsUrl, buildGoogleFlightsSearchUrl as buildGoogleFlightsUrl } from '../../utils/googleFlightsUrl';
 
 export function normalizeFlight(
@@ -85,8 +102,8 @@ export function normalizeFlight(
       layoverAirport = firstSegment.arrival_airport?.id ?? null;
       // Estimate layover duration: gap between first segment arrival and second segment departure
       if (result.flights.length >= 2) {
-        const seg1Arrival = new Date(firstSegment.arrival_airport.time);
-        const seg2Departure = new Date(result.flights[1].departure_airport.time);
+        const seg1Arrival = parseAirportLocalTime(firstSegment.arrival_airport.time);
+        const seg2Departure = parseAirportLocalTime(result.flights[1].departure_airport.time);
         const gap = Math.round((seg2Departure.getTime() - seg1Arrival.getTime()) / 60000);
         if (gap > 0) layoverDuration = gap;
       }
@@ -101,8 +118,8 @@ export function normalizeFlight(
     flightNumber: firstSegment.flight_number,
     departureAirport: firstSegment.departure_airport.id as IATACode,
     arrivalAirport: lastSegment.arrival_airport.id as IATACode,
-    departureTime: new Date(firstSegment.departure_airport.time),
-    arrivalTime: new Date(lastSegment.arrival_airport.time),
+    departureTime: parseAirportLocalTime(firstSegment.departure_airport.time),
+    arrivalTime: parseAirportLocalTime(lastSegment.arrival_airport.time),
     durationMinutes: totalDuration,
     price: result.price * passengers,
     currency: 'USD',
