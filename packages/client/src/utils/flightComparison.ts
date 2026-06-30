@@ -1,5 +1,5 @@
 import type { Flight, Comparison } from '@flightselect/shared';
-import { RecommendedOption } from '@flightselect/shared';
+import { RecommendedOption, expandAirportCodes } from '@flightselect/shared';
 
 export interface DirectionSplit {
   outbound: Flight[];
@@ -9,14 +9,25 @@ export interface DirectionSplit {
 export function splitFlightsByDirection(
   flights: Flight[],
   originAirport: string,
-  destinationAirport: string
+  destinationAirport: string,
+  includeNearbyAirports = false,
+  nearbyRadiusMiles?: number | null
 ): DirectionSplit {
+  // Must recognize the same candidate airports the server actually scraped —
+  // see comparison.job.ts and search.job.ts, which use the same
+  // expandAirportCodes so a nearby-airport flight (e.g. EWR for a JFK search)
+  // isn't silently dropped from the results split.
+  const originCandidates = new Set(expandAirportCodes(originAirport, includeNearbyAirports, nearbyRadiusMiles));
+  const destinationCandidates = new Set(
+    expandAirportCodes(destinationAirport, includeNearbyAirports, nearbyRadiusMiles)
+  );
+
   const outbound: Flight[] = [];
   const ret: Flight[] = [];
   for (const f of flights) {
-    if (f.departureAirport === originAirport && f.arrivalAirport === destinationAirport) {
+    if (originCandidates.has(f.departureAirport) && destinationCandidates.has(f.arrivalAirport)) {
       outbound.push(f);
-    } else if (f.departureAirport === destinationAirport && f.arrivalAirport === originAirport) {
+    } else if (destinationCandidates.has(f.departureAirport) && originCandidates.has(f.arrivalAirport)) {
       ret.push(f);
     }
   }

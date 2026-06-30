@@ -23,6 +23,8 @@ export interface DbSearchQuery {
   preferredAirlines: string[];
   flexibleDates: boolean;
   flexibleDateRangeDays: number | null;
+  includeNearbyAirports: boolean;
+  nearbyRadiusMiles: number | null;
   status: string;
   createdAt: Date;
   userId: string | null;

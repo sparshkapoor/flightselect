@@ -28,6 +28,8 @@ function makeSearchQuery(overrides: Partial<DbSearchQuery> = {}): DbSearchQuery 
     preferredAirlines: [],
     flexibleDates: false,
     flexibleDateRangeDays: null,
+    includeNearbyAirports: false,
+    nearbyRadiusMiles: null,
     status: 'COMPLETED',
     createdAt: new Date('2026-06-26'),
     userId: null,
@@ -117,6 +119,81 @@ describe('processComparisonJob', () => {
 
     expect(roundTripTotalPrice).toBe(380); // real same-airline combo, not a multiplier
     expect(priceDifference).not.toBeNull();
+  });
+});
+
+describe('processComparisonJob — nearby airports', () => {
+  beforeEach(() => {
+    queryMock.mockReset();
+    queryOneMock.mockReset();
+  });
+
+  it('recognizes a flight departing a nearby airport as part of the route, not just the exact requested origin', async () => {
+    // EWR was requested; JFK is within the default 75mi nearby radius and is
+    // actually cheaper — must be picked up, not silently dropped by an exact match.
+    queryOneMock.mockResolvedValue(
+      makeSearchQuery({ originAirport: 'EWR', destinationAirport: 'SFO', includeNearbyAirports: true })
+    );
+    queryMock.mockImplementation((sql: string) => {
+      if (String(sql).startsWith('SELECT * FROM "Flight"')) {
+        return Promise.resolve([
+          makeFlight({ id: 'ewr-flight', price: '250.00', departureAirport: 'EWR', arrivalAirport: 'SFO' }),
+          makeFlight({ id: 'jfk-flight', price: '180.00', departureAirport: 'JFK', arrivalAirport: 'SFO' }),
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    await processComparisonJob({ searchQueryId: 'sq1' });
+
+    const [, , , oneWayOutboundFlightIds, , , oneWayTotalPrice] = getInsertedComparisonParams();
+
+    expect(oneWayOutboundFlightIds).toEqual(['jfk-flight']);
+    expect(oneWayTotalPrice).toBe(180); // the nearby airport's cheaper flight, picked as the hero
+  });
+
+  it('ignores a non-nearby airport even when includeNearbyAirports is on', async () => {
+    // LAX is nowhere near EWR — must not be swept in just because expansion is enabled.
+    queryOneMock.mockResolvedValue(
+      makeSearchQuery({ originAirport: 'EWR', destinationAirport: 'SFO', includeNearbyAirports: true })
+    );
+    queryMock.mockImplementation((sql: string) => {
+      if (String(sql).startsWith('SELECT * FROM "Flight"')) {
+        return Promise.resolve([
+          makeFlight({ id: 'ewr-flight', price: '250.00', departureAirport: 'EWR', arrivalAirport: 'SFO' }),
+          makeFlight({ id: 'lax-flight', price: '50.00', departureAirport: 'LAX', arrivalAirport: 'SFO' }),
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    await processComparisonJob({ searchQueryId: 'sq1' });
+
+    const [, , , oneWayOutboundFlightIds, , , oneWayTotalPrice] = getInsertedComparisonParams();
+
+    expect(oneWayOutboundFlightIds).toEqual(['ewr-flight']);
+    expect(oneWayTotalPrice).toBe(250);
+  });
+
+  it('falls back to exact-match only when includeNearbyAirports is off', async () => {
+    queryOneMock.mockResolvedValue(
+      makeSearchQuery({ originAirport: 'EWR', destinationAirport: 'SFO', includeNearbyAirports: false })
+    );
+    queryMock.mockImplementation((sql: string) => {
+      if (String(sql).startsWith('SELECT * FROM "Flight"')) {
+        return Promise.resolve([
+          makeFlight({ id: 'ewr-flight', price: '250.00', departureAirport: 'EWR', arrivalAirport: 'SFO' }),
+          makeFlight({ id: 'jfk-flight', price: '180.00', departureAirport: 'JFK', arrivalAirport: 'SFO' }),
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    await processComparisonJob({ searchQueryId: 'sq1' });
+
+    const [, , , oneWayOutboundFlightIds] = getInsertedComparisonParams();
+
+    expect(oneWayOutboundFlightIds).toEqual(['ewr-flight']);
   });
 });
 

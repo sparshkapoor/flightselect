@@ -27,6 +27,14 @@ export const SearchRequestSchema = z
     preferredAirlines: z.array(z.string()).optional(),
     flexibleDates: z.boolean().default(false),
     flexibleDateRangeDays: z.number().int().min(1).max(7).optional(),
+    // Expands originAirport (and destinationAirport) to nearby airports before
+    // scraping — SerpAPI's departure_id/arrival_id accept comma-separated codes
+    // natively, so this stays one scraper call. nearbyRadiusMiles defaults to a
+    // tight metro-area radius when includeNearbyAirports is on but no explicit
+    // radius is given; capped at 200mi, and airportsWithin() caps candidate count
+    // regardless of radius so cost can't blow up.
+    includeNearbyAirports: z.boolean().default(false),
+    nearbyRadiusMiles: z.number().int().min(1).max(200).optional(),
     userId: z.string().uuid().optional(),
     // Required when tripType === MULTI_CITY (2-6 legs); originAirport/destinationAirport/
     // departureDate above should be the envelope (legs[0].origin, legs[N-1].destination,

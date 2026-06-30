@@ -58,6 +58,8 @@ export function SearchForm() {
           maxLayovers: store.maxLayovers,
           flexibleDates: store.flexibleDates,
           flexibleDateRangeDays: store.flexibleDateRangeDays,
+          includeNearbyAirports: store.includeNearbyAirports,
+          nearbyRadiusMiles: store.nearbyRadiusMiles,
           preferredAirlines: store.preferredAirlines.length ? store.preferredAirlines : undefined,
           avoidedAirlines: store.avoidedAirlines.length ? store.avoidedAirlines : undefined,
         });
@@ -145,6 +147,10 @@ export function SearchForm() {
           onFlexibleDatesChange={store.setFlexibleDates}
           flexibleDateRangeDays={store.flexibleDateRangeDays}
           onFlexibleDateRangeDaysChange={store.setFlexibleDateRangeDays}
+          includeNearbyAirports={store.includeNearbyAirports}
+          onIncludeNearbyAirportsChange={store.setIncludeNearbyAirports}
+          nearbyRadiusMiles={store.nearbyRadiusMiles}
+          onNearbyRadiusMilesChange={store.setNearbyRadiusMiles}
           preferredAirlines={store.preferredAirlines}
           avoidedAirlines={store.avoidedAirlines}
           onPreferredAirlinesChange={store.setPreferredAirlines}

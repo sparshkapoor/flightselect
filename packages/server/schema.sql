@@ -38,10 +38,14 @@ CREATE TABLE IF NOT EXISTS "SearchQuery" (
     "preferredAirlines"         TEXT[],
     "flexibleDates"             BOOLEAN        NOT NULL DEFAULT false,
     "flexibleDateRangeDays"     INTEGER,
+    "includeNearbyAirports"     BOOLEAN        NOT NULL DEFAULT false,
+    "nearbyRadiusMiles"         INTEGER,
     "status"                    "SearchStatus" NOT NULL DEFAULT 'PENDING',
     "createdAt"                 TIMESTAMP(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "userId"                    TEXT           REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
+ALTER TABLE "SearchQuery" ADD COLUMN IF NOT EXISTS "includeNearbyAirports" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "SearchQuery" ADD COLUMN IF NOT EXISTS "nearbyRadiusMiles" INTEGER;
 
 -- Multi-city only: one row per leg of the trip (always one-way). Flight rows belonging to
 -- a leg reference it via Flight.searchLegId — necessary because a multi-city trip can repeat

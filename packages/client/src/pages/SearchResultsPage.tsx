@@ -176,8 +176,15 @@ export function SearchResultsPage() {
   const isMultiCity = searchData?.tripType === TripType.MULTI_CITY;
 
   const { outbound: outboundFlights, return: returnFlights } = useMemo(
-    () => splitFlightsByDirection(allFlights, originAirport, destinationAirport),
-    [allFlights, originAirport, destinationAirport]
+    () =>
+      splitFlightsByDirection(
+        allFlights,
+        originAirport,
+        destinationAirport,
+        searchData?.includeNearbyAirports ?? false,
+        searchData?.nearbyRadiusMiles
+      ),
+    [allFlights, originAirport, destinationAirport, searchData?.includeNearbyAirports, searchData?.nearbyRadiusMiles]
   );
 
   // Pre-populate airline filter from search form's preferredAirlines once per search

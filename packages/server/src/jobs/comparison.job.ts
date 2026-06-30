@@ -1,6 +1,6 @@
 import { query, queryOne } from '../config/database';
 import { logger } from '../utils/logger';
-import { RecommendedOption, TripType } from '@flightselect/shared';
+import { RecommendedOption, TripType, expandAirportCodes } from '@flightselect/shared';
 import { DbSearchQuery, DbFlight, DbSearchLeg } from '../types/db';
 
 export interface ComparisonJobData {
@@ -72,12 +72,24 @@ export async function processComparisonJob(data: ComparisonJobData): Promise<voi
     return processMultiCityComparison(searchQueryId, flights);
   }
 
+  // Must recognize the same candidate airports search.job.ts actually scraped —
+  // when includeNearbyAirports is on, flights can legitimately depart/arrive at
+  // a nearby airport (e.g. EWR/LGA for a JFK search), not just the literal
+  // requested originAirport/destinationAirport. Same expandAirportCodes used
+  // there, so the two never disagree on what counts as "this search's route".
+  const originCandidates = new Set(
+    expandAirportCodes(searchQuery.originAirport, searchQuery.includeNearbyAirports, searchQuery.nearbyRadiusMiles)
+  );
+  const destinationCandidates = new Set(
+    expandAirportCodes(searchQuery.destinationAirport, searchQuery.includeNearbyAirports, searchQuery.nearbyRadiusMiles)
+  );
+
   const outboundFlights = flights
-    .filter((f: DbFlight) => f.departureAirport === searchQuery.originAirport && f.arrivalAirport === searchQuery.destinationAirport)
+    .filter((f: DbFlight) => originCandidates.has(f.departureAirport) && destinationCandidates.has(f.arrivalAirport))
     .sort((a: DbFlight, b: DbFlight) => Number(a.price) - Number(b.price));
 
   const returnFlights = flights
-    .filter((f: DbFlight) => f.departureAirport === searchQuery.destinationAirport && f.arrivalAirport === searchQuery.originAirport)
+    .filter((f: DbFlight) => destinationCandidates.has(f.departureAirport) && originCandidates.has(f.arrivalAirport))
     .sort((a: DbFlight, b: DbFlight) => Number(a.price) - Number(b.price));
 
   if (returnFlights.length === 0) {

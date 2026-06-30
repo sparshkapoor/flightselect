@@ -7,6 +7,10 @@ interface AdvancedFiltersProps {
   onFlexibleDatesChange: (v: boolean) => void;
   flexibleDateRangeDays: number | undefined;
   onFlexibleDateRangeDaysChange: (v: number | undefined) => void;
+  includeNearbyAirports: boolean;
+  onIncludeNearbyAirportsChange: (v: boolean) => void;
+  nearbyRadiusMiles: number | undefined;
+  onNearbyRadiusMilesChange: (v: number | undefined) => void;
   preferredAirlines: string[];
   avoidedAirlines: string[];
   onPreferredAirlinesChange: (v: string[]) => void;
@@ -26,6 +30,10 @@ export function AdvancedFilters({
   onFlexibleDatesChange,
   flexibleDateRangeDays,
   onFlexibleDateRangeDaysChange,
+  includeNearbyAirports,
+  onIncludeNearbyAirportsChange,
+  nearbyRadiusMiles,
+  onNearbyRadiusMilesChange,
   preferredAirlines,
   avoidedAirlines,
   onPreferredAirlinesChange,
@@ -88,6 +96,33 @@ export function AdvancedFilters({
                 {[1, 2, 3, 5, 7].map((d) => (
                   <option key={d} value={d}>
                     ±{d} day{d > 1 ? 's' : ''}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* Nearby airports */}
+          <div className="flex items-center gap-3">
+            <input
+              id="nearbyAirports"
+              type="checkbox"
+              checked={includeNearbyAirports}
+              onChange={(e) => onIncludeNearbyAirportsChange(e.target.checked)}
+              className="rounded accent-brand-600"
+            />
+            <label htmlFor="nearbyAirports" className="text-sm font-medium text-ink-muted">
+              Include nearby airports
+            </label>
+            {includeNearbyAirports && (
+              <select
+                value={nearbyRadiusMiles ?? 75}
+                onChange={(e) => onNearbyRadiusMilesChange(Number(e.target.value))}
+                className="ml-2 input-field w-auto text-sm"
+              >
+                {[50, 75, 100, 150, 200].map((mi) => (
+                  <option key={mi} value={mi}>
+                    within {mi} mi
                   </option>
                 ))}
               </select>

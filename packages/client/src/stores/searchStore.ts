@@ -24,6 +24,8 @@ interface SearchState {
   maxLayovers: number | undefined;
   flexibleDates: boolean;
   flexibleDateRangeDays: number | undefined;
+  includeNearbyAirports: boolean;
+  nearbyRadiusMiles: number | undefined;
   preferredAirlines: string[];
   avoidedAirlines: string[];
   compareMode: boolean;
@@ -49,6 +51,8 @@ interface SearchState {
   setMaxLayovers: (v: number | undefined) => void;
   setFlexibleDates: (v: boolean) => void;
   setFlexibleDateRangeDays: (v: number | undefined) => void;
+  setIncludeNearbyAirports: (v: boolean) => void;
+  setNearbyRadiusMiles: (v: number | undefined) => void;
   setPreferredAirlines: (v: string[]) => void;
   setAvoidedAirlines: (v: string[]) => void;
   setCompareMode: (v: boolean) => void;
@@ -74,6 +78,8 @@ const initialState = {
   maxLayovers: undefined as number | undefined,
   flexibleDates: false,
   flexibleDateRangeDays: undefined as number | undefined,
+  includeNearbyAirports: false,
+  nearbyRadiusMiles: undefined as number | undefined,
   preferredAirlines: [] as string[],
   avoidedAirlines: [] as string[],
   compareMode: true,
@@ -109,6 +115,8 @@ export const useSearchStore = create<SearchState>((set, get) => ({
   setMaxLayovers: (v) => set({ maxLayovers: v }),
   setFlexibleDates: (v) => set({ flexibleDates: v }),
   setFlexibleDateRangeDays: (v) => set({ flexibleDateRangeDays: v }),
+  setIncludeNearbyAirports: (v) => set({ includeNearbyAirports: v }),
+  setNearbyRadiusMiles: (v) => set({ nearbyRadiusMiles: v }),
   setPreferredAirlines: (v) => set({ preferredAirlines: v }),
   setAvoidedAirlines: (v) => set({ avoidedAirlines: v }),
   setCompareMode: (v) => set({ compareMode: v }),

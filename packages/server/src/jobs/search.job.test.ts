@@ -69,6 +69,8 @@ function makeSearchQuery(overrides: Partial<DbSearchQuery> = {}): DbSearchQuery 
     preferredAirlines: [],
     flexibleDates: false,
     flexibleDateRangeDays: null,
+    includeNearbyAirports: false,
+    nearbyRadiusMiles: null,
     status: 'PENDING',
     createdAt: new Date('2026-06-26'),
     userId: null,
@@ -170,5 +172,60 @@ describe('processSearchJob — flexible dates', () => {
 
     // Clamped to 5: ±5 days = 11 candidate dates, not 21.
     expect(searchMock).toHaveBeenCalledTimes(11);
+  });
+});
+
+describe('processSearchJob — nearby airports', () => {
+  beforeEach(() => {
+    queryMock.mockReset().mockResolvedValue([]);
+    queryOneMock.mockReset();
+    searchMock.mockClear().mockResolvedValue(scrapedFlights);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
+  });
+
+  it('passes the requested airport alone when nearby airports is off', async () => {
+    queryOneMock.mockResolvedValue(
+      makeSearchQuery({ originAirport: 'EWR', destinationAirport: 'SFO', includeNearbyAirports: false })
+    );
+
+    await processSearchJob({ searchQueryId: 'sq1' });
+
+    const [params] = searchMock.mock.calls[0];
+    expect((params as { originAirport: string }).originAirport).toBe('EWR');
+    expect((params as { destinationAirport: string }).destinationAirport).toBe('SFO');
+  });
+
+  it('expands origin and destination into a comma-joined list of nearby airports when enabled', async () => {
+    // EWR has JFK/LGA within its default 75mi radius; SFO has OAK/SJC.
+    queryOneMock.mockResolvedValue(
+      makeSearchQuery({ originAirport: 'EWR', destinationAirport: 'SFO', includeNearbyAirports: true })
+    );
+
+    await processSearchJob({ searchQueryId: 'sq1' });
+
+    const [params] = searchMock.mock.calls[0];
+    const origin = (params as { originAirport: string }).originAirport;
+    const destination = (params as { destinationAirport: string }).destinationAirport;
+
+    expect(origin.split(',')).toContain('EWR');
+    expect(origin.split(',').length).toBeGreaterThan(1);
+    expect(destination.split(',')).toContain('SFO');
+    expect(destination.split(',').length).toBeGreaterThan(1);
+  });
+
+  it('respects an explicit nearbyRadiusMiles over the default', async () => {
+    queryOneMock.mockResolvedValue(
+      makeSearchQuery({
+        originAirport: 'EWR',
+        destinationAirport: 'SFO',
+        includeNearbyAirports: true,
+        nearbyRadiusMiles: 1, // tight enough that nothing qualifies
+      })
+    );
+
+    await processSearchJob({ searchQueryId: 'sq1' });
+
+    const [params] = searchMock.mock.calls[0];
+    expect((params as { originAirport: string }).originAirport).toBe('EWR');
   });
 });

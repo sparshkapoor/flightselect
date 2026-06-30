@@ -64,6 +64,8 @@ model SearchQuery {
   preferredAirlines           String[]
   flexibleDates               Boolean       @default(false)
   flexibleDateRangeDays       Int?
+  includeNearbyAirports       Boolean       @default(false)
+  nearbyRadiusMiles           Int?
   status                      SearchStatus  @default(PENDING)
   createdAt                   DateTime      @default(now())
   userId                      String?

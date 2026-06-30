@@ -119,6 +119,32 @@ describe('splitFlightsByDirection', () => {
     const { return: ret } = splitFlightsByDirection(all, 'EWR', 'SFO');
     expect(ret.every((f) => f.departureAirport === 'SFO' && f.arrivalAirport === 'EWR')).toBe(true);
   });
+
+  it('drops a nearby-airport flight when includeNearbyAirports is off (exact match only)', () => {
+    const jfkFlight = makeFlight({ id: 'jfk-1', airline: 'Delta', departureAirport: 'JFK', arrivalAirport: 'SFO', price: 180 });
+    const { outbound } = splitFlightsByDirection([jfkFlight], 'EWR', 'SFO');
+    expect(outbound).toHaveLength(0);
+  });
+
+  it('includes a flight from a nearby airport when includeNearbyAirports is on', () => {
+    // JFK is within EWR's default 75mi nearby radius.
+    const jfkFlight = makeFlight({ id: 'jfk-1', airline: 'Delta', departureAirport: 'JFK', arrivalAirport: 'SFO', price: 180 });
+    const { outbound } = splitFlightsByDirection([jfkFlight], 'EWR', 'SFO', true);
+    expect(outbound).toHaveLength(1);
+    expect(outbound[0].id).toBe('jfk-1');
+  });
+
+  it('still excludes a genuinely distant airport even with includeNearbyAirports on', () => {
+    const laxFlight = makeFlight({ id: 'lax-1', airline: 'Delta', departureAirport: 'LAX', arrivalAirport: 'SFO', price: 50 });
+    const { outbound } = splitFlightsByDirection([laxFlight], 'EWR', 'SFO', true);
+    expect(outbound).toHaveLength(0);
+  });
+
+  it('respects an explicit nearbyRadiusMiles narrower than the default', () => {
+    const jfkFlight = makeFlight({ id: 'jfk-1', airline: 'Delta', departureAirport: 'JFK', arrivalAirport: 'SFO', price: 180 });
+    const { outbound } = splitFlightsByDirection([jfkFlight], 'EWR', 'SFO', true, 1);
+    expect(outbound).toHaveLength(0);
+  });
 });
 
 // ── computeFilteredComparison ─────────────────────────────────────────────────

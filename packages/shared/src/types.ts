@@ -62,6 +62,8 @@ export interface SearchQuery {
   preferredAirlines: string[] | null;
   flexibleDates: boolean;
   flexibleDateRangeDays: number | null;
+  includeNearbyAirports: boolean;
+  nearbyRadiusMiles: number | null;
   status: SearchStatus;
   createdAt: string;
   userId: string | null;
@@ -125,6 +127,8 @@ export interface SearchRequest {
   preferredAirlines?: string[];
   flexibleDates?: boolean;
   flexibleDateRangeDays?: number;
+  includeNearbyAirports?: boolean;
+  nearbyRadiusMiles?: number;
   userId?: string;
   /** Required when tripType === MULTI_CITY, 2-6 entries. originAirport/destinationAirport/
    *  departureDate above should be set to the envelope (legs[0].origin, legs[N-1].destination,

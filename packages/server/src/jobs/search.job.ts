@@ -2,10 +2,20 @@ import { query, queryOne } from '../config/database';
 import { ScraperFactory } from '../scrapers/scraper.factory';
 import { processComparisonJob } from './comparison.job';
 import { logger } from '../utils/logger';
-import { CabinClass, TripType } from '@flightselect/shared';
+import { CabinClass, TripType, expandAirportCodes } from '@flightselect/shared';
 import { DbSearchQuery, DbSearchLeg } from '../types/db';
 import { env } from '../config/env';
 import type { ScrapedFlight } from '../scrapers/scraper.interface';
+
+// SerpAPI's google_flights departure_id/arrival_id accept comma-separated
+// codes and return results merged in one call, each carrying its own real
+// departure_airport/arrival_airport — so expansion is just building this
+// string, no fan-out and no scraper changes required. comparison.job.ts and
+// the client's splitFlightsByDirection must recognize the same candidate
+// airports, so the expansion logic itself lives in @flightselect/shared.
+function expandAirportCodesParam(code: string, includeNearby: boolean, radiusMiles: number | null): string {
+  return expandAirportCodes(code, includeNearby, radiusMiles).join(',');
+}
 
 export interface SearchJobData {
   searchQueryId: string;
@@ -116,16 +126,27 @@ export async function processSearchJob(data: SearchJobData): Promise<void> {
         searchQuery.flexibleDates,
         searchQuery.flexibleDateRangeDays
       );
+      const expandedOrigin = expandAirportCodesParam(
+        searchQuery.originAirport,
+        searchQuery.includeNearbyAirports,
+        searchQuery.nearbyRadiusMiles
+      );
+      const expandedDestination = expandAirportCodesParam(
+        searchQuery.destinationAirport,
+        searchQuery.includeNearbyAirports,
+        searchQuery.nearbyRadiusMiles
+      );
       logger.info(
-        `Search ${searchQueryId}: ${datePairs.length} date pair(s)${searchQuery.flexibleDates ? ' (flexible dates)' : ''}`
+        `Search ${searchQueryId}: ${datePairs.length} date pair(s)${searchQuery.flexibleDates ? ' (flexible dates)' : ''}` +
+        (searchQuery.includeNearbyAirports ? ` (nearby: ${expandedOrigin} -> ${expandedDestination})` : '')
       );
       tasks = scrapers.flatMap((scraper) =>
         datePairs.map((pair) => ({
           searchLegId: null,
           promise: scraper.search({
             searchQueryId,
-            originAirport: searchQuery.originAirport,
-            destinationAirport: searchQuery.destinationAirport,
+            originAirport: expandedOrigin,
+            destinationAirport: expandedDestination,
             departureDate: pair.departureDate,
             returnDate: pair.returnDate,
             passengers: searchQuery.passengers,

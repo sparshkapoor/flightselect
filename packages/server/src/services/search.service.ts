@@ -13,8 +13,8 @@ export class SearchService {
         id, "originAirport", "destinationAirport", "departureDate", "returnDate",
         "tripType", passengers, "cabinClass", "maxLayovers", "maxTotalDurationMinutes",
         "preferredLayoverAirports", "avoidedAirlines", "preferredAirlines",
-        "flexibleDates", "flexibleDateRangeDays", "userId"
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+        "flexibleDates", "flexibleDateRangeDays", "includeNearbyAirports", "nearbyRadiusMiles", "userId"
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
       [
         id,
         input.originAirport,
@@ -31,6 +31,8 @@ export class SearchService {
         input.preferredAirlines ?? [],
         input.flexibleDates ?? false,
         input.flexibleDateRangeDays ?? null,
+        input.includeNearbyAirports ?? false,
+        input.nearbyRadiusMiles ?? null,
         input.userId ?? null,
       ]
     );
