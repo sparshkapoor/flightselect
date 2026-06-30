@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Flight, BookingOption } from '@flightselect/shared';
 import { PriceTag } from './PriceTag';
 import { FlightTimeline } from './FlightTimeline';
@@ -33,6 +34,7 @@ export function FlightCard({
   eagerMessage,
   tiedCount = 0,
 }: FlightCardProps) {
+  const [showMoreOptions, setShowMoreOptions] = useState(false);
   const eager = mode === 'eager';
   const lazy = useBookingOptions(flight.id);
   const bookingOptions = eager ? eagerOptions : lazy.options;
@@ -109,19 +111,36 @@ export function FlightCard({
                   Book on {bookingOptions[0].seller} →
                 </a>
                 {bookingOptions.length > 1 && (
-                  <div className="max-h-24 overflow-y-auto space-y-0.5">
-                    {bookingOptions.slice(1).map((opt, i) => (
-                      <a
-                        key={i}
-                        href={opt.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="block w-full text-center text-xs text-ink-faint hover:text-ink py-1 hover:underline underline-offset-2"
+                  <div className="text-center">
+                    {showMoreOptions ? (
+                      <div className="space-y-0.5">
+                        {bookingOptions.slice(1).map((opt, i) => (
+                          <a
+                            key={i}
+                            href={opt.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="block w-full text-center text-xs text-ink-faint hover:text-ink py-1 hover:underline underline-offset-2"
+                          >
+                            {opt.seller}{opt.price ? ` — $${opt.price}` : ''}
+                          </a>
+                        ))}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setShowMoreOptions(false); }}
+                          className="text-xs text-ink-faint hover:text-ink-cool underline-offset-2 hover:underline"
+                        >
+                          Show less
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setShowMoreOptions(true); }}
+                        className="text-xs text-ink-faint hover:text-ink-cool underline-offset-2 hover:underline"
                       >
-                        {opt.seller}{opt.price ? ` — $${opt.price}` : ''}
-                      </a>
-                    ))}
+                        +{bookingOptions.length - 1} more options
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
