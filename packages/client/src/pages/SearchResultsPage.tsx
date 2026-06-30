@@ -162,6 +162,8 @@ export function SearchResultsPage() {
                 oneWayReturnFlights={activeComparison.oneWayReturnFlightIds?.map((id: string) =>
                   allFlights.find((f) => f.id === id)
                 ).filter(Boolean) ?? []}
+                allOutboundFlights={outboundFlights}
+                allReturnFlights={returnFlights}
               />
             ) : null}
 

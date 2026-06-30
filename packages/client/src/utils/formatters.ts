@@ -30,6 +30,15 @@ export function formatTime(dateStr: string): string {
   return `${displayHours}:${String(minutes).padStart(2, '0')} ${period}`;
 }
 
+const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// Same UTC-pinned constraint as formatTime above — the date portion of a
+// flight timestamp is airport-local digits, not a real instant.
+export function formatFlightDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  return `${SHORT_MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
+}
+
 export function formatPriceDifference(diff: number): string {
   const abs = Math.abs(diff);
   return `$${abs.toFixed(0)}`;

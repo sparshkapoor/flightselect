@@ -16,6 +16,8 @@ interface FlightCardProps {
   /** Required when mode === 'eager' — fetched once for the whole view by the parent. */
   eagerOptions?: BookingOption[] | null;
   eagerLoading?: boolean;
+  /** How many OTHER flights in this leg's list tie this flight's price. */
+  tiedCount?: number;
 }
 
 export function FlightCard({
@@ -25,6 +27,7 @@ export function FlightCard({
   mode = 'lazy',
   eagerOptions = null,
   eagerLoading = false,
+  tiedCount = 0,
 }: FlightCardProps) {
   const eager = mode === 'eager';
   const lazy = useBookingOptions(flight.id);
@@ -81,6 +84,9 @@ export function FlightCard({
       <div className="text-right shrink-0 flex flex-col items-end gap-0.5">
         <PriceTag amount={Number(flight.price)} currency={flight.currency} />
         <div className="text-xs text-ink-faint">{CABIN_CLASS_LABELS[flight.cabinClass]} · one-way</div>
+        {tiedCount > 0 && (
+          <div className="text-[0.6875rem] text-ink-faint">+{tiedCount} more at this price</div>
+        )}
 
         {eager ? (
           <div className="mt-1.5 w-full space-y-1.5">

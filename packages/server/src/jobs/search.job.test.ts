@@ -42,9 +42,11 @@ const scrapedFlights = [
   makeScrapedFlight({ airline: 'Delta', flightNumber: 'DL300', price: 300 }),
 ];
 
+const searchMock = vi.fn().mockResolvedValue(scrapedFlights);
+
 vi.mock('../scrapers/scraper.factory', () => ({
   ScraperFactory: {
-    getAvailableScrapers: () => [{ search: vi.fn().mockResolvedValue(scrapedFlights) }],
+    getAvailableScrapers: () => [{ search: searchMock }],
   },
 }));
 
@@ -84,6 +86,7 @@ describe('processSearchJob — avoidedAirlines', () => {
   beforeEach(() => {
     queryMock.mockReset().mockResolvedValue([]);
     queryOneMock.mockReset();
+    searchMock.mockClear().mockResolvedValue(scrapedFlights);
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
   });
 
@@ -109,5 +112,63 @@ describe('processSearchJob — avoidedAirlines', () => {
     await processSearchJob({ searchQueryId: 'sq1' });
 
     expect(getInsertedAirlines()).toEqual(['United', 'Spirit', 'Delta']);
+  });
+});
+
+describe('processSearchJob — flexible dates', () => {
+  beforeEach(() => {
+    queryMock.mockReset().mockResolvedValue([]);
+    queryOneMock.mockReset();
+    searchMock.mockClear().mockResolvedValue(scrapedFlights);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
+  });
+
+  it('calls the scraper once when flexible dates is off', async () => {
+    queryOneMock.mockResolvedValue(makeSearchQuery({ flexibleDates: false }));
+
+    await processSearchJob({ searchQueryId: 'sq1' });
+
+    expect(searchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls the scraper once per candidate date on a one-way search (no return leg to vary)', async () => {
+    queryOneMock.mockResolvedValue(
+      makeSearchQuery({ flexibleDates: true, flexibleDateRangeDays: 2, returnDate: null })
+    );
+
+    await processSearchJob({ searchQueryId: 'sq1' });
+
+    // departure ±2 days = 5 candidate dates, no return leg to vary independently.
+    expect(searchMock).toHaveBeenCalledTimes(5);
+    const departureDates = searchMock.mock.calls
+      .map(([params]) => (params as { departureDate: Date }).departureDate.toISOString().slice(0, 10))
+      .sort();
+    expect(departureDates).toEqual(['2026-06-29', '2026-06-30', '2026-07-01', '2026-07-02', '2026-07-03']);
+  });
+
+  it('varies departure and return independently on a round trip, deduping the shared base pair', async () => {
+    queryOneMock.mockResolvedValue(
+      makeSearchQuery({
+        flexibleDates: true,
+        flexibleDateRangeDays: 2,
+        returnDate: new Date('2026-07-08'),
+      })
+    );
+
+    await processSearchJob({ searchQueryId: 'sq1' });
+
+    // 5 departure variants (return fixed) + 5 return variants (departure fixed) - 1 shared base pair = 9.
+    expect(searchMock).toHaveBeenCalledTimes(9);
+  });
+
+  it('clamps flexibleDateRangeDays to the server-side max regardless of what was stored', async () => {
+    queryOneMock.mockResolvedValue(
+      makeSearchQuery({ flexibleDates: true, flexibleDateRangeDays: 10, returnDate: null })
+    );
+
+    await processSearchJob({ searchQueryId: 'sq1' });
+
+    // Clamped to 5: ±5 days = 11 candidate dates, not 21.
+    expect(searchMock).toHaveBeenCalledTimes(11);
   });
 });

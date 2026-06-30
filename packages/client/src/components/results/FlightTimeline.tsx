@@ -1,4 +1,4 @@
-import { formatTime } from '../../utils/formatters';
+import { formatTime, formatFlightDate } from '../../utils/formatters';
 import { LayoverBadge } from './LayoverBadge';
 
 interface FlightTimelineProps {
@@ -29,13 +29,15 @@ export function FlightTimeline({
   return (
     <div className="flex-1 min-w-0">
       {/* Row 1: times + duration */}
-      <div className="flex items-baseline justify-between gap-2">
-        <div className="text-lg font-bold font-mono text-ink tabular-nums shrink-0">
-          {formatTime(departureTime)}
+      <div className="flex items-start justify-between gap-2">
+        <div className="shrink-0">
+          <div className="text-lg font-bold font-mono text-ink tabular-nums">{formatTime(departureTime)}</div>
+          <div className="text-[0.6875rem] font-mono text-ink-faint">{formatFlightDate(departureTime)}</div>
         </div>
-        <div className="text-xs font-mono text-ink-faint font-medium">{durationStr}</div>
-        <div className="text-lg font-bold font-mono text-ink tabular-nums shrink-0">
-          {formatTime(arrivalTime)}
+        <div className="text-xs font-mono text-ink-faint font-medium pt-1">{durationStr}</div>
+        <div className="shrink-0 text-right">
+          <div className="text-lg font-bold font-mono text-ink tabular-nums">{formatTime(arrivalTime)}</div>
+          <div className="text-[0.6875rem] font-mono text-ink-faint">{formatFlightDate(arrivalTime)}</div>
         </div>
       </div>
 

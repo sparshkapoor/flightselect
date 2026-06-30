@@ -23,6 +23,13 @@ export function splitFlightsByDirection(
   return { outbound, return: ret };
 }
 
+// How many OTHER flights in this leg's list share the chosen flight's price —
+// used to hint "N more at $X" near the hero's leg price, since the hero only
+// ever shows one specific tied flight (see comparison.job.ts's price sort).
+export function countTiedAtPrice(legFlights: Flight[], chosenFlightId: string, price: number): number {
+  return legFlights.filter((f) => f.id !== chosenFlightId && Number(f.price) === price).length;
+}
+
 export function computeFilteredComparison(
   outbound: Flight[],
   returnFlights: Flight[],

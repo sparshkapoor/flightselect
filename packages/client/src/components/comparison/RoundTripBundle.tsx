@@ -13,6 +13,9 @@ interface RoundTripBundleProps {
   outboundOptions: BookingOption[] | null;
   returnOptions: BookingOption[] | null;
   optionsLoading: boolean;
+  /** How many OTHER flights on this leg tie the shown flight's price. */
+  outboundTiedCount?: number;
+  returnTiedCount?: number;
 }
 
 interface LegRowProps {
@@ -20,9 +23,10 @@ interface LegRowProps {
   direction: 'Outbound' | 'Return';
   options: BookingOption[] | null;
   loading: boolean;
+  tiedCount?: number;
 }
 
-function LegRow({ flight, direction, options, loading }: LegRowProps) {
+function LegRow({ flight, direction, options, loading, tiedCount = 0 }: LegRowProps) {
   const handleViewGoogle = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (flight.bookingUrl) window.open(flight.bookingUrl, '_blank', 'noopener,noreferrer');
@@ -48,6 +52,11 @@ function LegRow({ flight, direction, options, loading }: LegRowProps) {
         <span className="text-base font-semibold font-mono text-ink-muted tabular-nums">
           ${Number(flight.price).toFixed(0)}
         </span>
+        {tiedCount > 0 && (
+          <span className="text-[0.6875rem] text-ink-faint">
+            +{tiedCount} more at this price
+          </span>
+        )}
         {loading ? (
           <div className="h-3 w-20 skeleton mt-0.5" />
         ) : topOption ? (
@@ -83,6 +92,8 @@ export function RoundTripBundle({
   outboundOptions,
   returnOptions,
   optionsLoading,
+  outboundTiedCount = 0,
+  returnTiedCount = 0,
 }: RoundTripBundleProps) {
   const airline = outboundFlight.airline;
   const eyebrow = returnFlight
@@ -135,7 +146,7 @@ export function RoundTripBundle({
 
       {/* Legs */}
       <div className="divide-y divide-hairline -mx-2">
-        <LegRow flight={outboundFlight} direction="Outbound" options={outboundOptions} loading={optionsLoading} />
+        <LegRow flight={outboundFlight} direction="Outbound" options={outboundOptions} loading={optionsLoading} tiedCount={outboundTiedCount} />
         {returnFlight && (
           <>
             <div className="flex items-center justify-center py-1 relative -my-3">
@@ -145,7 +156,7 @@ export function RoundTripBundle({
                 </svg>
               </div>
             </div>
-            <LegRow flight={returnFlight} direction="Return" options={returnOptions} loading={optionsLoading} />
+            <LegRow flight={returnFlight} direction="Return" options={returnOptions} loading={optionsLoading} tiedCount={returnTiedCount} />
           </>
         )}
       </div>

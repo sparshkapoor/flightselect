@@ -10,6 +10,61 @@ export interface SearchJobData {
   searchQueryId: string;
 }
 
+// Caps the stored flexibleDateRangeDays regardless of what was requested —
+// each extra day multiplies live scraper calls (real API cost/quota), so this
+// is a server-side sanity bound, not a UI-configurable limit.
+const MAX_FLEXIBLE_RANGE_DAYS = 5;
+
+function addDays(date: Date, days: number): Date {
+  const d = new Date(date);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d;
+}
+
+interface DatePair {
+  departureDate: Date;
+  returnDate: Date | undefined;
+}
+
+// Flexible dates vary departure and return independently, each holding the
+// other fixed at its originally-requested date — O(4*rangeDays + 1) scraper
+// calls instead of the full O((2*rangeDays+1)^2) departure x return grid.
+// This finds "the cheapest day to leave" and "the cheapest day to return"
+// separately; it won't find a combination where shifting both at once is
+// cheaper than shifting either alone, which is an accepted tradeoff for cost.
+function buildCandidateDatePairs(
+  departureDate: Date,
+  returnDate: Date | undefined,
+  flexibleDates: boolean,
+  flexibleDateRangeDays: number | null
+): DatePair[] {
+  if (!flexibleDates || !flexibleDateRangeDays) {
+    return [{ departureDate, returnDate }];
+  }
+
+  const rangeDays = Math.min(flexibleDateRangeDays, MAX_FLEXIBLE_RANGE_DAYS);
+  const seen = new Set<string>();
+  const pairs: DatePair[] = [];
+
+  const addPair = (dep: Date, ret: Date | undefined) => {
+    const key = `${dep.toISOString()}|${ret?.toISOString() ?? ''}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    pairs.push({ departureDate: dep, returnDate: ret });
+  };
+
+  for (let offset = -rangeDays; offset <= rangeDays; offset++) {
+    addPair(addDays(departureDate, offset), returnDate);
+  }
+  if (returnDate) {
+    for (let offset = -rangeDays; offset <= rangeDays; offset++) {
+      addPair(departureDate, addDays(returnDate, offset));
+    }
+  }
+
+  return pairs;
+}
+
 export async function processSearchJob(data: SearchJobData): Promise<void> {
   const { searchQueryId } = data;
 
@@ -26,17 +81,29 @@ export async function processSearchJob(data: SearchJobData): Promise<void> {
 
   try {
     const scrapers = ScraperFactory.getAvailableScrapers();
-    const flightPromises = scrapers.map((scraper) =>
-      scraper.search({
-        searchQueryId,
-        originAirport: searchQuery.originAirport,
-        destinationAirport: searchQuery.destinationAirport,
-        departureDate: searchQuery.departureDate,
-        returnDate: searchQuery.returnDate ?? undefined,
-        passengers: searchQuery.passengers,
-        cabinClass: searchQuery.cabinClass as CabinClass,
-        maxLayovers: searchQuery.maxLayovers ?? undefined,
-      })
+    const datePairs = buildCandidateDatePairs(
+      searchQuery.departureDate,
+      searchQuery.returnDate ?? undefined,
+      searchQuery.flexibleDates,
+      searchQuery.flexibleDateRangeDays
+    );
+    logger.info(
+      `Search ${searchQueryId}: ${datePairs.length} date pair(s)${searchQuery.flexibleDates ? ' (flexible dates)' : ''}`
+    );
+
+    const flightPromises = scrapers.flatMap((scraper) =>
+      datePairs.map((pair) =>
+        scraper.search({
+          searchQueryId,
+          originAirport: searchQuery.originAirport,
+          destinationAirport: searchQuery.destinationAirport,
+          departureDate: pair.departureDate,
+          returnDate: pair.returnDate,
+          passengers: searchQuery.passengers,
+          cabinClass: searchQuery.cabinClass as CabinClass,
+          maxLayovers: searchQuery.maxLayovers ?? undefined,
+        })
+      )
     );
 
     const results = await Promise.allSettled(flightPromises);

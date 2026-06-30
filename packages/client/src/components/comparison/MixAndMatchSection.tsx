@@ -11,6 +11,9 @@ interface MixAndMatchSectionProps {
   outboundOptions: BookingOption[] | null;
   returnOptions: BookingOption[] | null;
   optionsLoading: boolean;
+  /** How many OTHER flights on this leg tie the shown flight's price. */
+  outboundTiedCount?: number;
+  returnTiedCount?: number;
   /** When true, render with the same surface-2 hero weight as RoundTripBundle's
    *  recommended state — used when mixing airlines is the cheaper option. */
   hero?: boolean;
@@ -25,6 +28,8 @@ export function MixAndMatchSection({
   outboundOptions,
   returnOptions,
   optionsLoading,
+  outboundTiedCount = 0,
+  returnTiedCount = 0,
   hero = false,
 }: MixAndMatchSectionProps) {
   return (
@@ -59,8 +64,8 @@ export function MixAndMatchSection({
         </div>
       )}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <FlightCard flight={outboundFlight} mode="eager" eagerOptions={outboundOptions} eagerLoading={optionsLoading} />
-        <FlightCard flight={returnFlight} mode="eager" eagerOptions={returnOptions} eagerLoading={optionsLoading} />
+        <FlightCard flight={outboundFlight} mode="eager" eagerOptions={outboundOptions} eagerLoading={optionsLoading} tiedCount={outboundTiedCount} />
+        <FlightCard flight={returnFlight} mode="eager" eagerOptions={returnOptions} eagerLoading={optionsLoading} tiedCount={returnTiedCount} />
       </div>
     </div>
   );

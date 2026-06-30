@@ -8,12 +8,19 @@ import { ComparisonTable } from './ComparisonTable';
 import { AIInsightCard } from './AIInsightCard';
 import { useRoundTripBookingUrl } from '../../hooks/useRoundTripBookingUrl';
 import { useBatchBookingOptions } from '../../hooks/useBatchBookingOptions';
+import { formatFlightDate } from '../../utils/formatters';
+import { countTiedAtPrice } from '../../utils/flightComparison';
 
 interface ComparisonViewProps {
   comparison: Comparison;
   roundTripFlights: Flight[];
   oneWayOutboundFlights: Flight[];
   oneWayReturnFlights: Flight[];
+  /** Full unfiltered leg lists — used only to count how many other flights
+   *  tie the hero's chosen price, so the hero can hint there's more to see.
+   *  Optional: the standalone saved-comparison view doesn't have these. */
+  allOutboundFlights?: Flight[];
+  allReturnFlights?: Flight[];
 }
 
 export function ComparisonView({
@@ -21,6 +28,8 @@ export function ComparisonView({
   roundTripFlights,
   oneWayOutboundFlights,
   oneWayReturnFlights,
+  allOutboundFlights = [],
+  allReturnFlights = [],
 }: ComparisonViewProps) {
   const origin =
     oneWayOutboundFlights[0]?.departureAirport ?? roundTripFlights[0]?.departureAirport ?? '';
@@ -63,6 +72,21 @@ export function ComparisonView({
   const savingsAmount = comparison.priceDifference !== null ? Math.abs(Number(comparison.priceDifference)) : null;
   const isRoundTripCheapest = comparison.recommendedOption === RecommendedOption.ROUND_TRIP;
 
+  // Derived from the actual chosen flights, not the raw search request — once
+  // flexible dates can shift the flown date away from what was requested,
+  // this is the only source of truth for what's actually being booked.
+  const tripDateRange = hasRoundTrip
+    ? `${formatFlightDate(rtOutbound.departureTime)} – ${formatFlightDate(rtReturn.departureTime)}`
+    : bestOutbound
+    ? formatFlightDate(bestOutbound.departureTime)
+    : null;
+  const tripSubtitle = origin && destination
+    ? `${origin} → ${destination}${tripDateRange ? ` · ${tripDateRange}` : ''}`
+    : null;
+
+  const tiedCountFor = (flight: Flight | undefined, allLegFlights: Flight[]): number =>
+    flight ? countTiedAtPrice(allLegFlights, flight.id, Number(flight.price)) : 0;
+
   if (!hasRoundTrip) {
     // No return flights for this route — render a graceful single-leg hero
     // (same shell as the round-trip case) instead of a separate apologetic block.
@@ -70,8 +94,13 @@ export function ComparisonView({
 
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between animate-fadeInUp">
-          <h2 className="text-h1 text-ink">Your Trip</h2>
+        <div className="animate-fadeInUp">
+          <div className="flex items-center justify-between">
+            <h2 className="text-h1 text-ink">Your Trip</h2>
+          </div>
+          {tripSubtitle && (
+            <div className="text-sm font-mono text-ink-cool mt-1">{tripSubtitle}</div>
+          )}
         </div>
 
         {origin && destination && (
@@ -91,6 +120,7 @@ export function ComparisonView({
             outboundOptions={optionsFor(bestOutbound.id)}
             returnOptions={null}
             optionsLoading={optionsLoading}
+            outboundTiedCount={tiedCountFor(bestOutbound, allOutboundFlights)}
           />
         </div>
       </div>
@@ -99,8 +129,13 @@ export function ComparisonView({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between animate-fadeInUp">
-        <h2 className="text-h1 text-ink">Your Trip</h2>
+      <div className="animate-fadeInUp">
+        <div className="flex items-center justify-between">
+          <h2 className="text-h1 text-ink">Your Trip</h2>
+        </div>
+        {tripSubtitle && (
+          <div className="text-sm font-mono text-ink-cool mt-1">{tripSubtitle}</div>
+        )}
       </div>
 
       {origin && destination && (
@@ -122,6 +157,8 @@ export function ComparisonView({
               outboundOptions={optionsFor(rtOutbound.id)}
               returnOptions={optionsFor(rtReturn.id)}
               optionsLoading={optionsLoading}
+              outboundTiedCount={tiedCountFor(rtOutbound, allOutboundFlights)}
+              returnTiedCount={tiedCountFor(rtReturn, allReturnFlights)}
             />
           </div>
 
@@ -142,6 +179,8 @@ export function ComparisonView({
                 outboundOptions={optionsFor(oneWayOutboundFlights[0].id)}
                 returnOptions={optionsFor(oneWayReturnFlights[0].id)}
                 optionsLoading={optionsLoading}
+                outboundTiedCount={tiedCountFor(oneWayOutboundFlights[0], allOutboundFlights)}
+                returnTiedCount={tiedCountFor(oneWayReturnFlights[0], allReturnFlights)}
               />
             </div>
           )}
@@ -159,6 +198,8 @@ export function ComparisonView({
                 outboundOptions={optionsFor(oneWayOutboundFlights[0].id)}
                 returnOptions={optionsFor(oneWayReturnFlights[0].id)}
                 optionsLoading={optionsLoading}
+                outboundTiedCount={tiedCountFor(oneWayOutboundFlights[0], allOutboundFlights)}
+                returnTiedCount={tiedCountFor(oneWayReturnFlights[0], allReturnFlights)}
                 hero
               />
             </div>
@@ -181,6 +222,8 @@ export function ComparisonView({
               outboundOptions={optionsFor(rtOutbound.id)}
               returnOptions={optionsFor(rtReturn.id)}
               optionsLoading={optionsLoading}
+              outboundTiedCount={tiedCountFor(rtOutbound, allOutboundFlights)}
+              returnTiedCount={tiedCountFor(rtReturn, allReturnFlights)}
             />
           </div>
         </>
