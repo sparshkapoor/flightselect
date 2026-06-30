@@ -7,7 +7,7 @@ import { ResultsContainer } from '../components/results/ResultsContainer';
 import { ComparisonView } from '../components/comparison/ComparisonView';
 import { MultiCityBundle } from '../components/comparison/MultiCityBundle';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
-import { splitFlightsByDirection, computeFilteredComparison } from '../utils/flightComparison';
+import { splitFlightsByDirection, computeFilteredComparison, hasActiveFilters } from '../utils/flightComparison';
 import { useMultiCityBookingUrl } from '../hooks/useMultiCityBookingUrl';
 import { useBatchBookingOptions } from '../hooks/useBatchBookingOptions';
 import type { Flight } from '@flightselect/shared';
@@ -236,11 +236,12 @@ export function SearchResultsPage() {
 
   const activeComparison = useMemo(() => {
     if (!latestComparison) return null;
-    if (filterStore.selectedAirlines.length > 0) {
+    if (hasActiveFilters(filterStore)) {
       return computeFilteredComparison(filteredAndSortedFlights, filteredAndSortedReturnFlights, latestComparison);
     }
     return latestComparison;
-  }, [latestComparison, filterStore.selectedAirlines, filteredAndSortedFlights, filteredAndSortedReturnFlights]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latestComparison, filterStore, filteredAndSortedFlights, filteredAndSortedReturnFlights]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">

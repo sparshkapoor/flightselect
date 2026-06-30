@@ -1,5 +1,27 @@
 import type { Flight, Comparison } from '@flightselect/shared';
 import { RecommendedOption, expandAirportCodes } from '@flightselect/shared';
+import type { FilterState } from '../stores/filterStore';
+
+/**
+ * True when any filter is actually constraining results. The recommended
+ * round-trip/mix-and-match hero must recompute from the filtered flight
+ * lists whenever this is true — previously it only recomputed for
+ * selectedAirlines, so e.g. "direct flights only" correctly filtered the
+ * outbound/return lists below but left the hero showing a flight with a
+ * layover.
+ */
+export function hasActiveFilters(filters: FilterState): boolean {
+  return (
+    filters.selectedAirlines.length > 0 ||
+    filters.maxPrice !== undefined ||
+    filters.minPrice !== undefined ||
+    filters.maxDurationMinutes !== undefined ||
+    filters.maxLayovers !== undefined ||
+    filters.maxLayoverDurationMinutes !== undefined ||
+    !!filters.departureTimeStart ||
+    !!filters.departureTimeEnd
+  );
+}
 
 export interface DirectionSplit {
   outbound: Flight[];

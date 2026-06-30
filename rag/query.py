@@ -40,14 +40,21 @@ _COMPARISON_PROMPT = (
 
 # Knowledge prompt — grounds soft-factor insights (bag fees, card waivers,
 # points/transfer value) in the ingested docs/ knowledge, never the flight rows.
+# Written defensively for a small local model: explicit length cap and a hard
+# ban on quoting/copying, because a weak model's failure mode here is dumping
+# a retrieved chunk back near-verbatim (including the source markdown's own
+# bold/bullet syntax) instead of synthesizing — that's a real failure observed
+# in testing, not a hypothetical.
 _KNOWLEDGE_PROMPT = (
-    "You are a travel-rewards analyst writing for a flight comparison UI. "
-    "Using ONLY the reference facts below, give the 1-3 most relevant bag-fee, "
-    "credit-card, or points/miles considerations for this itinerary. "
-    "Name the specific card or program. Each consideration is one short sentence. "
+    "You are a travel-rewards analyst writing ONE short insight for a flight comparison UI. "
+    "Read the reference facts below, then WRITE YOUR OWN sentence — do not copy, quote, or "
+    "paraphrase closely from the reference text, and do not repeat its headings or labels. "
+    "Pick the single most relevant bag-fee, credit-card, or points/miles consideration for "
+    "this itinerary and state it in your own words, naming the specific card or program. "
+    "Maximum 30 words, ONE sentence, plain prose only — no markdown, no bold, no bullet points, "
+    "no headings, no numbered lists. "
     "When a fact is dated, phrase it as 'as of {its date}'. "
     "Only mention a time-limited transfer bonus if TODAY falls within its stated active window. "
-    "No markdown headers, no preamble — just the considerations as plain sentences. "
     "If nothing in the references is relevant, reply with exactly: insufficient data"
 )
 
@@ -60,7 +67,7 @@ def _ym(value: str) -> str:
 def query_knowledge(
     itinerary_summary: str,
     airlines: list[str] | None = None,
-    n_results: int = 5,
+    n_results: int = 3,
     today: date | None = None,
 ) -> dict:
     """Retrieve soft-factor knowledge and synthesize a grounded insight.

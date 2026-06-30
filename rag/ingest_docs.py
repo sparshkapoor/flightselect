@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 
 from rag.embedder import embed
-from rag.vectorstore import ingest
+from rag.vectorstore import delete_where, ingest
 
 logging.basicConfig(
     stream=sys.stderr,
@@ -34,6 +34,19 @@ DOCS_DIR = Path(__file__).parent.parent / "docs"
 # Only these docs are retrievable knowledge. llm-rag-design.md is intentionally
 # absent (meta-design, not fact).
 KNOWLEDGE_DOCS = ["credit-cards.md", "points-miles.md"]
+
+# Sections that are instructions for developers/the pipeline itself — schema
+# examples, "what to surface" templates, "verify before shipping" TODOs — not
+# verifiable user-facing facts. Retrieving these produced answers that quoted
+# the pipeline's own instructions/example templates back at the user instead
+# of a real fact. Matched case-insensitively against the `## ` heading text.
+EXCLUDED_SECTIONS = {
+    "chunk metadata schema",
+    "items requiring live verification before shipping",
+    "what the pipeline surfaces automatically",
+    "storage schema",
+    "live verification",
+}
 
 
 def _parse_frontmatter(text: str) -> tuple[dict, str]:
@@ -107,7 +120,7 @@ def ingest_doc(path: Path) -> int:
     metadatas: list[dict] = []
 
     for heading, section_text in _split_sections(body):
-        if not section_text:
+        if not section_text or heading.strip().lower() in EXCLUDED_SECTIONS:
             continue
         # Prepend title + heading so the section's topic is in the embedded
         # vector, not just the body prose — sharpens retrieval precision.
@@ -120,6 +133,12 @@ def ingest_doc(path: Path) -> int:
             "as_of": as_of,
             "review_after": review_after,
         })
+
+    # Wipe this doc's previous chunks first — upsert alone never prunes ids
+    # that are no longer produced (e.g. a section just excluded above, or one
+    # renamed/removed from the source markdown), so without this they'd stay
+    # retrievable forever as stale orphans.
+    delete_where({"$and": [{"kind": "knowledge"}, {"doc_type": doc_type}]})
 
     if not documents:
         logger.warning("%s produced no chunks — skipping", path.name)

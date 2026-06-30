@@ -18,6 +18,28 @@ function formatAsOf(asOf: string): string {
   return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
+// Defensive against the local model occasionally dumping a retrieved chunk
+// back near-verbatim instead of synthesizing — strips markdown syntax and
+// collapses to one line so raw "**bold**" / "## heading" / "- bullet" never
+// reaches the UI even when the prompt isn't followed perfectly.
+function sanitizeInsight(raw: string): string {
+  return raw
+    .split('\n')
+    .map((line) =>
+      line
+        .replace(/^#{1,6}\s*/, '')
+        .replace(/^[-*•]\s+/, '')
+        .replace(/^\d+\.\s+/, '')
+        .trim()
+    )
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/__(.+?)__/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export function TravelIntelligenceCard({ comparison, origin, destination, flights }: TravelIntelligenceCardProps) {
   const [state, setState] = useState<State>('loading');
   const [insight, setInsight] = useState('');
@@ -32,7 +54,7 @@ export function TravelIntelligenceCard({ comparison, origin, destination, flight
     const attempt = (retriesLeft: number) => {
       queryKnowledge(itinerarySummary, airlines).then((result) => {
         if (result) {
-          setInsight(result.answer);
+          setInsight(sanitizeInsight(result.answer));
           setAsOf(result.asOf);
           setStale(result.stale);
           setState('ready');

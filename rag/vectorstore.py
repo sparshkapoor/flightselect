@@ -46,6 +46,18 @@ def ingest(
     logger.info("Wrote %d documents to collection '%s'", len(documents), config.COLLECTION_NAME)
 
 
+def delete_where(where: dict) -> None:
+    """Delete every document matching a metadata filter.
+
+    Used before re-ingesting a knowledge doc so a section removed or renamed
+    from the source markdown (e.g. excluded from retrieval) doesn't linger as
+    an orphaned chunk forever — upsert alone only ever replaces ids it's
+    given, it never prunes ids that are no longer produced.
+    """
+    col = _collection()
+    col.delete(where=where)
+
+
 def retrieve(
     query_embedding: list[float],
     n_results: int | None = None,
