@@ -2,11 +2,13 @@
 DO $$ BEGIN CREATE TYPE "CabinClass" AS ENUM ('ECONOMY', 'PREMIUM_ECONOMY', 'BUSINESS', 'FIRST');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-DO $$ BEGIN CREATE TYPE "TripType" AS ENUM ('ONE_WAY', 'ROUND_TRIP');
+DO $$ BEGIN CREATE TYPE "TripType" AS ENUM ('ONE_WAY', 'ROUND_TRIP', 'MULTI_CITY');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TYPE "TripType" ADD VALUE IF NOT EXISTS 'MULTI_CITY';
 
-DO $$ BEGIN CREATE TYPE "RecommendedOption" AS ENUM ('ROUND_TRIP', 'ONE_WAY', 'MIXED');
+DO $$ BEGIN CREATE TYPE "RecommendedOption" AS ENUM ('ROUND_TRIP', 'ONE_WAY', 'MIXED', 'MULTI_CITY');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TYPE "RecommendedOption" ADD VALUE IF NOT EXISTS 'MULTI_CITY';
 
 DO $$ BEGIN CREATE TYPE "SearchStatus" AS ENUM ('PENDING', 'COMPLETED', 'FAILED');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
@@ -41,6 +43,20 @@ CREATE TABLE IF NOT EXISTS "SearchQuery" (
     "userId"                    TEXT           REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
+-- Multi-city only: one row per leg of the trip (always one-way). Flight rows belonging to
+-- a leg reference it via Flight.searchLegId — necessary because a multi-city trip can repeat
+-- the same airport pair on different dates (e.g. EWR->LAS twice), so legs can't be disambiguated
+-- by (originAirport, destinationAirport) alone the way the 2-leg round-trip flow does.
+CREATE TABLE IF NOT EXISTS "SearchLeg" (
+    "id"                TEXT         NOT NULL PRIMARY KEY,
+    "searchQueryId"     TEXT         NOT NULL REFERENCES "SearchQuery"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    "legIndex"          INTEGER      NOT NULL,
+    "originAirport"     TEXT         NOT NULL,
+    "destinationAirport" TEXT        NOT NULL,
+    "departureDate"     TIMESTAMP(3) NOT NULL
+);
+CREATE INDEX IF NOT EXISTS "SearchLeg_searchQueryId_idx" ON "SearchLeg"("searchQueryId");
+
 CREATE TABLE IF NOT EXISTS "Flight" (
     "id"                    TEXT         NOT NULL PRIMARY KEY,
     "airline"               TEXT         NOT NULL,
@@ -60,8 +76,10 @@ CREATE TABLE IF NOT EXISTS "Flight" (
     "scrapedAt"             TIMESTAMP(3) NOT NULL,
     "bookingUrl"            TEXT,
     "rawData"               JSONB,
-    "searchQueryId"         TEXT         NOT NULL REFERENCES "SearchQuery"("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    "searchQueryId"         TEXT         NOT NULL REFERENCES "SearchQuery"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    "searchLegId"           TEXT         REFERENCES "SearchLeg"("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
+ALTER TABLE "Flight" ADD COLUMN IF NOT EXISTS "searchLegId" TEXT REFERENCES "SearchLeg"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 CREATE TABLE IF NOT EXISTS "Comparison" (
     "id"                        TEXT              NOT NULL PRIMARY KEY,
@@ -75,14 +93,20 @@ CREATE TABLE IF NOT EXISTS "Comparison" (
     "recommendedOption"         "RecommendedOption" NOT NULL,
     "aiAnalysis"                TEXT,
     "aiAnalysisGeneratedAt"     TIMESTAMP(3),
-    "createdAt"                 TIMESTAMP(3)      NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "createdAt"                 TIMESTAMP(3)      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "legFlightIds"              TEXT[],
+    "multiCityTotalPrice"       DECIMAL(65,30)
 );
+ALTER TABLE "Comparison" ADD COLUMN IF NOT EXISTS "legFlightIds" TEXT[];
+ALTER TABLE "Comparison" ADD COLUMN IF NOT EXISTS "multiCityTotalPrice" DECIMAL(65,30);
 
 -- Round-trip pricing is not always derivable (e.g. no return flights for the route) — nullable
 -- so that case can be represented honestly instead of inventing a number. Idempotent for
--- databases created before this column allowed NULL.
+-- databases created before this column allowed NULL. oneWayTotalPrice similarly nullable now
+-- that multi-city comparisons don't populate it (they use multiCityTotalPrice instead).
 ALTER TABLE "Comparison" ALTER COLUMN "roundTripTotalPrice" DROP NOT NULL;
 ALTER TABLE "Comparison" ALTER COLUMN "priceDifference" DROP NOT NULL;
+ALTER TABLE "Comparison" ALTER COLUMN "oneWayTotalPrice" DROP NOT NULL;
 
 CREATE TABLE IF NOT EXISTS "SavedSearch" (
     "id"                 TEXT           NOT NULL PRIMARY KEY,

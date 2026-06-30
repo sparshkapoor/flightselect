@@ -151,6 +151,33 @@ export function buildGoogleFlightsRoundTripTfsUrl(
   return `https://www.google.com/travel/flights/search?tfs=${b64}&tfu=EgIIAQ&hl=en&gl=us&curr=USD`;
 }
 
+export interface MultiCityLegInput {
+  segments: FlightSegment[];
+  origin: string;
+  dest: string;
+}
+
+// Multi-city deep-link built from N legs' real segment lists — same top-level
+// message as the one-way/round-trip builders (repeated field-3 leg entries),
+// but field 19 = 3. Verified byte-for-byte against a tfs Google itself issued
+// for a real 3-leg multi-city search (NYC->LAS->ORD->NYC) — field 19 is NOT 1
+// (that's round-trip specifically); multi-city has its own distinct value.
+export function buildGoogleFlightsMultiCityTfsUrl(legs: MultiCityLegInput[]): string {
+  const legBytes = legs.map((leg) => buildLegBytes(leg.segments, leg.origin, leg.dest));
+  const tfs: number[] = [
+    ...pbVarint(1, 28),
+    ...pbVarint(2, 2), // 2 for all trip types — see field 19 below
+    ...legBytes.flatMap((bytes) => pbBytes(3, bytes)),
+    ...pbVarint(8, 1),
+    ...pbVarint(9, 1),
+    ...pbVarint(14, 1),
+    ...pbBytes(16, NO_LIMIT_F16),
+    ...pbVarint(19, 3), // trip type: 3 = multi-city
+  ];
+  const b64 = Buffer.from(tfs).toString('base64url');
+  return `https://www.google.com/travel/flights/search?tfs=${b64}&tfu=EgIIAQ&hl=en&gl=us&curr=USD`;
+}
+
 // SerpAPI's `booking_token` is base64 JSON: [opaqueGoogleToken, [[origin, date,
 // dest, layoverAirport, airline, flightNum], ...]] — one entry per real
 // segment, already exactly what we need to build an accurate multi-segment
@@ -230,4 +257,25 @@ export function deriveRoundTripBookingUrl(
     outboundSegments, outbound.departureAirport, outbound.arrivalAirport,
     returnSegments, ret.departureAirport, ret.arrivalAirport,
   );
+}
+
+export interface MultiCityFlightInput {
+  departureAirport: string;
+  arrivalAirport: string;
+  rawData?: Record<string, unknown> | null;
+}
+
+// Derives a combined multi-city booking URL for N chosen flights (one per
+// leg, in leg order). Same all-or-nothing honesty as the round-trip version:
+// null if any leg is missing real segment data, rather than a guess that
+// could describe a different itinerary than what's shown.
+export function deriveMultiCityBookingUrl(legs: MultiCityFlightInput[]): string | null {
+  const legInputs: MultiCityLegInput[] = [];
+  for (const leg of legs) {
+    const token = typeof leg.rawData?.bookingToken === 'string' ? leg.rawData.bookingToken : null;
+    const segments = token ? parseSegmentsFromBookingToken(token) : null;
+    if (!segments) return null;
+    legInputs.push({ segments, origin: leg.departureAirport, dest: leg.arrivalAirport });
+  }
+  return buildGoogleFlightsMultiCityTfsUrl(legInputs);
 }

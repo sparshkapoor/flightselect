@@ -14,3 +14,11 @@ export async function getRoundTripBookingUrl(outboundId: string, returnId: strin
   return response.data.data.url;
 }
 
+/** flightIds must be in leg order (legIndex 0..N-1) — order determines the tfs leg order. */
+export async function getMultiCityBookingUrl(flightIds: string[]): Promise<string | null> {
+  const response = await apiClient.get('/flights/multi-city-booking-url', {
+    params: { flightIds: flightIds.join(',') },
+  });
+  return response.data.data.url;
+}
+

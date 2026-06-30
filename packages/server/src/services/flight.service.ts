@@ -1,6 +1,6 @@
 import { query, queryOne } from '../config/database';
 import { DbFlight } from '../types/db';
-import { deriveBookingUrl, deriveRoundTripBookingUrl } from '../utils/googleFlightsUrl';
+import { deriveBookingUrl, deriveRoundTripBookingUrl, deriveMultiCityBookingUrl } from '../utils/googleFlightsUrl';
 
 function withBookingUrl(flight: DbFlight): DbFlight {
   return {
@@ -39,6 +39,14 @@ export class FlightService {
     ]);
     if (!outbound || !ret) return null;
     return deriveRoundTripBookingUrl(outbound, ret);
+  }
+
+  async getMultiCityBookingUrl(flightIds: string[]): Promise<string | null> {
+    const flights = await Promise.all(
+      flightIds.map((id) => queryOne<DbFlight>('SELECT * FROM "Flight" WHERE id = $1', [id]))
+    );
+    if (flights.some((f) => !f)) return null;
+    return deriveMultiCityBookingUrl(flights as DbFlight[]);
   }
 }
 

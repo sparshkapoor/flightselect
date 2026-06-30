@@ -21,6 +21,7 @@ enum CabinClass {
 enum TripType {
   ONE_WAY
   ROUND_TRIP
+  MULTI_CITY
 }
 
 enum SearchStatus {
@@ -33,6 +34,7 @@ enum RecommendedOption {
   ROUND_TRIP
   ONE_WAY
   MIXED
+  MULTI_CITY
 }
 
 model User {
@@ -69,6 +71,21 @@ model SearchQuery {
   flights                     Flight[]
   comparisons                 Comparison[]
   savedSearches               SavedSearch[]
+  legs                        SearchLeg[]
+}
+
+// Multi-city only: one row per leg (always one-way). Flight.searchLegId disambiguates
+// which leg a flight belongs to — needed since a trip can repeat the same airport pair
+// on different dates, so (originAirport, destinationAirport) alone isn't unique per leg.
+model SearchLeg {
+  id                  String      @id @default(uuid())
+  searchQueryId       String
+  searchQuery         SearchQuery @relation(fields: [searchQueryId], references: [id])
+  legIndex            Int
+  originAirport       String
+  destinationAirport  String
+  departureDate       DateTime
+  flights             Flight[]
 }
 
 model Flight {
@@ -92,6 +109,8 @@ model Flight {
   rawData                Json?
   searchQueryId          String
   searchQuery            SearchQuery @relation(fields: [searchQueryId], references: [id])
+  searchLegId            String?
+  searchLeg              SearchLeg?  @relation(fields: [searchLegId], references: [id])
 }
 
 model Comparison {
@@ -102,12 +121,16 @@ model Comparison {
   oneWayOutboundFlightIds String[]
   oneWayReturnFlightIds String[]
   roundTripTotalPrice   Decimal?
-  oneWayTotalPrice      Decimal
+  oneWayTotalPrice      Decimal?
   priceDifference       Decimal?
   recommendedOption     RecommendedOption
   aiAnalysis            String?
   aiAnalysisGeneratedAt DateTime?
   createdAt             DateTime          @default(now())
+  /// Multi-city only: one flight ID per leg, ordered by legIndex.
+  legFlightIds          String[]
+  /// Multi-city only: sum of the cheapest flight on each leg.
+  multiCityTotalPrice   Decimal?
 }
 
 model SavedSearch {

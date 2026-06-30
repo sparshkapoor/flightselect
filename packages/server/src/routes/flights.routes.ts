@@ -10,6 +10,9 @@ router.get('/', (req, res, next) => flightsController.getFlights(req, res, next)
 router.get('/round-trip-booking-url', (req, res, next) =>
   flightsController.getRoundTripBookingUrl(req, res, next)
 );
+router.get('/multi-city-booking-url', (req, res, next) =>
+  flightsController.getMultiCityBookingUrl(req, res, next)
+);
 router.post('/booking-options/batch', bookingOptionsRateLimit, (req, res, next) =>
   bookingOptionsController.getBookingOptionsBatch(req, res, next)
 );

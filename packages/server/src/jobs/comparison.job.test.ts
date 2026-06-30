@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { DbSearchQuery, DbFlight } from '../types/db';
+import type { DbSearchQuery, DbFlight, DbSearchLeg } from '../types/db';
 
 const queryMock = vi.fn();
 const queryOneMock = vi.fn();
@@ -117,5 +117,78 @@ describe('processComparisonJob', () => {
 
     expect(roundTripTotalPrice).toBe(380); // real same-airline combo, not a multiplier
     expect(priceDifference).not.toBeNull();
+  });
+});
+
+describe('processComparisonJob — multi-city', () => {
+  beforeEach(() => {
+    queryMock.mockReset();
+    queryOneMock.mockReset();
+  });
+
+  function makeLeg(overrides: Partial<DbSearchLeg> & { id: string; legIndex: number }): DbSearchLeg {
+    return {
+      searchQueryId: 'sq1',
+      originAirport: 'EWR',
+      destinationAirport: 'LAS',
+      departureDate: new Date('2026-07-06'),
+      ...overrides,
+    };
+  }
+
+  it('picks the cheapest flight per leg and sums them into multiCityTotalPrice', async () => {
+    queryOneMock.mockResolvedValue(makeSearchQuery({ tripType: 'MULTI_CITY' }));
+    const legs = [
+      makeLeg({ id: 'leg-1', legIndex: 0 }),
+      makeLeg({ id: 'leg-2', legIndex: 1, originAirport: 'LAS', destinationAirport: 'ORD' }),
+      makeLeg({ id: 'leg-3', legIndex: 2, originAirport: 'ORD', destinationAirport: 'EWR' }),
+    ];
+    queryMock.mockImplementation((sql: string) => {
+      if (String(sql).startsWith('SELECT * FROM "Flight"')) {
+        return Promise.resolve([
+          makeFlight({ id: 'leg1-cheap', price: '200.00', searchLegId: "leg-1" }),
+          makeFlight({ id: 'leg1-pricey', price: '300.00', searchLegId: "leg-1" }),
+          makeFlight({ id: 'leg2-cheap', price: '150.00', searchLegId: "leg-2" }),
+          makeFlight({ id: 'leg3-cheap', price: '220.00', searchLegId: "leg-3" }),
+        ]);
+      }
+      if (String(sql).startsWith('SELECT * FROM "SearchLeg"')) {
+        return Promise.resolve(legs);
+      }
+      return Promise.resolve([]);
+    });
+
+    await processComparisonJob({ searchQueryId: 'sq1' });
+
+    const params = getInsertedComparisonParams();
+    const recommendedOption = params[8];
+    const legFlightIds = params[11];
+    const multiCityTotalPrice = params[12];
+
+    expect(recommendedOption).toBe('MULTI_CITY');
+    expect(legFlightIds).toEqual(['leg1-cheap', 'leg2-cheap', 'leg3-cheap']);
+    expect(multiCityTotalPrice).toBe(570); // 200 + 150 + 220
+  });
+
+  it('skips creating a comparison when a leg has no flights at all', async () => {
+    queryOneMock.mockResolvedValue(makeSearchQuery({ tripType: 'MULTI_CITY' }));
+    const legs = [
+      makeLeg({ id: 'leg-1', legIndex: 0 }),
+      makeLeg({ id: 'leg-2', legIndex: 1, originAirport: 'LAS', destinationAirport: 'ORD' }),
+    ];
+    queryMock.mockImplementation((sql: string) => {
+      if (String(sql).startsWith('SELECT * FROM "Flight"')) {
+        return Promise.resolve([makeFlight({ id: 'leg1-only', price: '200.00', searchLegId: "leg-1" })]);
+      }
+      if (String(sql).startsWith('SELECT * FROM "SearchLeg"')) {
+        return Promise.resolve(legs);
+      }
+      return Promise.resolve([]);
+    });
+
+    await processComparisonJob({ searchQueryId: 'sq1' });
+
+    const insertCall = queryMock.mock.calls.find(([sql]) => String(sql).includes('INSERT INTO "Comparison"'));
+    expect(insertCall).toBeUndefined();
   });
 });

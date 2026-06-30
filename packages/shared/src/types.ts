@@ -30,9 +30,21 @@ export interface Flight {
   bookingUrl: string | null;
   rawData?: Record<string, unknown> | null;
   searchQueryId: string;
+  /** Multi-city only: which leg this flight belongs to. */
+  searchLegId?: string | null;
 }
 
 export type SearchStatus = 'PENDING' | 'COMPLETED' | 'FAILED';
+
+/** One leg of a multi-city trip — always one-way (no separate return on a leg itself). */
+export interface SearchLeg {
+  id: string;
+  searchQueryId: string;
+  legIndex: number;
+  originAirport: IATACode;
+  destinationAirport: IATACode;
+  departureDate: string;
+}
 
 export interface SearchQuery {
   id: string;
@@ -53,6 +65,10 @@ export interface SearchQuery {
   status: SearchStatus;
   createdAt: string;
   userId: string | null;
+  /** Multi-city only — originAirport/destinationAirport/departureDate above are
+   *  the envelope (first leg's origin, last leg's destination, first leg's date);
+   *  these are the authoritative per-leg routes. */
+  legs?: SearchLeg[];
 }
 
 export interface Comparison {
@@ -62,12 +78,16 @@ export interface Comparison {
   oneWayOutboundFlightIds: string[];
   oneWayReturnFlightIds: string[];
   roundTripTotalPrice: number | null;
-  oneWayTotalPrice: number;
+  oneWayTotalPrice: number | null;
   priceDifference: number | null;
   recommendedOption: RecommendedOption;
   aiAnalysis: string | null;
   aiAnalysisGeneratedAt: string | null;
   createdAt: string;
+  /** Multi-city only: one flight ID per leg, ordered by legIndex. */
+  legFlightIds: string[];
+  /** Multi-city only: sum of the cheapest flight on each leg. */
+  multiCityTotalPrice: number | null;
 }
 
 export interface User {
@@ -106,6 +126,10 @@ export interface SearchRequest {
   flexibleDates?: boolean;
   flexibleDateRangeDays?: number;
   userId?: string;
+  /** Required when tripType === MULTI_CITY, 2-6 entries. originAirport/destinationAirport/
+   *  departureDate above should be set to the envelope (legs[0].origin, legs[N-1].destination,
+   *  legs[0].departureDate) for backward-compat with code that reads those fields directly. */
+  legs?: { originAirport: string; destinationAirport: string; departureDate: string }[];
 }
 
 export interface SearchResponse {
@@ -124,6 +148,8 @@ export interface ComparisonResponse {
   roundTripFlights: Flight[];
   oneWayOutboundFlights: Flight[];
   oneWayReturnFlights: Flight[];
+  /** Multi-city only — one chosen flight per leg, ordered by legIndex. */
+  legFlights: Flight[];
 }
 
 

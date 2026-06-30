@@ -2,9 +2,10 @@ import { query, queryOne } from '../config/database';
 import { ScraperFactory } from '../scrapers/scraper.factory';
 import { processComparisonJob } from './comparison.job';
 import { logger } from '../utils/logger';
-import { CabinClass } from '@flightselect/shared';
-import { DbSearchQuery } from '../types/db';
+import { CabinClass, TripType } from '@flightselect/shared';
+import { DbSearchQuery, DbSearchLeg } from '../types/db';
 import { env } from '../config/env';
+import type { ScrapedFlight } from '../scrapers/scraper.interface';
 
 export interface SearchJobData {
   searchQueryId: string;
@@ -81,35 +82,69 @@ export async function processSearchJob(data: SearchJobData): Promise<void> {
 
   try {
     const scrapers = ScraperFactory.getAvailableScrapers();
-    const datePairs = buildCandidateDatePairs(
-      searchQuery.departureDate,
-      searchQuery.returnDate ?? undefined,
-      searchQuery.flexibleDates,
-      searchQuery.flexibleDateRangeDays
-    );
-    logger.info(
-      `Search ${searchQueryId}: ${datePairs.length} date pair(s)${searchQuery.flexibleDates ? ' (flexible dates)' : ''}`
-    );
+    const isMultiCity = searchQuery.tripType === TripType.MULTI_CITY;
 
-    const flightPromises = scrapers.flatMap((scraper) =>
-      datePairs.map((pair) =>
-        scraper.search({
-          searchQueryId,
-          originAirport: searchQuery.originAirport,
-          destinationAirport: searchQuery.destinationAirport,
-          departureDate: pair.departureDate,
-          returnDate: pair.returnDate,
-          passengers: searchQuery.passengers,
-          cabinClass: searchQuery.cabinClass as CabinClass,
-          maxLayovers: searchQuery.maxLayovers ?? undefined,
-        })
-      )
-    );
+    // Each task is one scraper call; searchLegId tags which leg (multi-city) the
+    // resulting flights belong to, or null for the normal one-way/round-trip flow.
+    let tasks: { searchLegId: string | null; promise: Promise<ScrapedFlight[]> }[];
 
-    const results = await Promise.allSettled(flightPromises);
-    const scrapedFlights = results
-      .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof scrapers[0]['search']>>> => r.status === 'fulfilled')
-      .flatMap((r) => r.value);
+    if (isMultiCity) {
+      const legs = await query<DbSearchLeg>(
+        'SELECT * FROM "SearchLeg" WHERE "searchQueryId" = $1 ORDER BY "legIndex" ASC',
+        [searchQueryId]
+      );
+      logger.info(`Search ${searchQueryId}: multi-city, ${legs.length} leg(s)`);
+      tasks = scrapers.flatMap((scraper) =>
+        legs.map((leg) => ({
+          searchLegId: leg.id,
+          promise: scraper.search({
+            searchQueryId,
+            originAirport: leg.originAirport,
+            destinationAirport: leg.destinationAirport,
+            departureDate: leg.departureDate,
+            returnDate: undefined,
+            passengers: searchQuery.passengers,
+            cabinClass: searchQuery.cabinClass as CabinClass,
+            maxLayovers: searchQuery.maxLayovers ?? undefined,
+          }),
+        }))
+      );
+    } else {
+      const datePairs = buildCandidateDatePairs(
+        searchQuery.departureDate,
+        searchQuery.returnDate ?? undefined,
+        searchQuery.flexibleDates,
+        searchQuery.flexibleDateRangeDays
+      );
+      logger.info(
+        `Search ${searchQueryId}: ${datePairs.length} date pair(s)${searchQuery.flexibleDates ? ' (flexible dates)' : ''}`
+      );
+      tasks = scrapers.flatMap((scraper) =>
+        datePairs.map((pair) => ({
+          searchLegId: null,
+          promise: scraper.search({
+            searchQueryId,
+            originAirport: searchQuery.originAirport,
+            destinationAirport: searchQuery.destinationAirport,
+            departureDate: pair.departureDate,
+            returnDate: pair.returnDate,
+            passengers: searchQuery.passengers,
+            cabinClass: searchQuery.cabinClass as CabinClass,
+            maxLayovers: searchQuery.maxLayovers ?? undefined,
+          }),
+        }))
+      );
+    }
+
+    const settled = await Promise.allSettled(tasks.map((t) => t.promise));
+    const scrapedFlights: { flight: ScrapedFlight; searchLegId: string | null }[] = [];
+    settled.forEach((result, i) => {
+      if (result.status === 'fulfilled') {
+        for (const flight of result.value) {
+          scrapedFlights.push({ flight, searchLegId: tasks[i].searchLegId });
+        }
+      }
+    });
 
     // Filtered here (not passed to the scraper) so it's guaranteed correct
     // regardless of whether the upstream API honors an exclude param.
@@ -117,23 +152,23 @@ export async function processSearchJob(data: SearchJobData): Promise<void> {
       (searchQuery.avoidedAirlines ?? []).map((a) => a.toLowerCase())
     );
     const allFlights = avoidedAirlines.size
-      ? scrapedFlights.filter((f) => !avoidedAirlines.has(f.airline.toLowerCase()))
+      ? scrapedFlights.filter(({ flight }) => !avoidedAirlines.has(flight.airline.toLowerCase()))
       : scrapedFlights;
 
     if (allFlights.length > 0) {
       await Promise.all(
-        allFlights.map((f) =>
+        allFlights.map(({ flight: f, searchLegId }) =>
           query(
             `INSERT INTO "Flight" (
               id, "searchQueryId", airline, "flightNumber",
               "departureAirport", "arrivalAirport", "departureTime", "arrivalTime",
               "durationMinutes", price, currency, "cabinClass",
               "isLayover", "layoverAirport", "layoverDurationMinutes",
-              source, "scrapedAt", "bookingUrl", "rawData"
+              source, "scrapedAt", "bookingUrl", "rawData", "searchLegId"
             ) VALUES (
               $1, $2, $3, $4, $5, $6, $7, $8,
               $9, $10, $11, $12, $13, $14, $15,
-              $16, $17, $18, $19
+              $16, $17, $18, $19, $20
             )`,
             [
               crypto.randomUUID(),
@@ -155,6 +190,7 @@ export async function processSearchJob(data: SearchJobData): Promise<void> {
               f.scrapedAt,
               f.bookingUrl ?? null,
               f.rawData ?? null,
+              searchLegId,
             ]
           )
         )
@@ -175,7 +211,7 @@ export async function processSearchJob(data: SearchJobData): Promise<void> {
     if (allFlights.length > 0) {
       const ragPayload = {
         search_query_id: searchQueryId,
-        flights: allFlights.map((f) => ({
+        flights: allFlights.map(({ flight: f }) => ({
           origin: f.departureAirport,
           destination: f.arrivalAirport,
           date: new Date(f.departureTime).toISOString().slice(0, 10),

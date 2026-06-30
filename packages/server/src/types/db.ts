@@ -48,6 +48,7 @@ export interface DbFlight {
   bookingUrl: string | null;
   rawData: Record<string, unknown> | null;
   searchQueryId: string;
+  searchLegId: string | null;
 }
 
 export interface DbComparison {
@@ -57,10 +58,21 @@ export interface DbComparison {
   oneWayOutboundFlightIds: string[];
   oneWayReturnFlightIds: string[];
   roundTripTotalPrice: string | null; // DECIMAL — null when no round-trip option exists
-  oneWayTotalPrice: string;    // DECIMAL
+  oneWayTotalPrice: string | null;    // DECIMAL — null for multi-city comparisons
   priceDifference: string | null;     // DECIMAL — null when no round-trip option exists
   recommendedOption: string;
   aiAnalysis: string | null;
   aiAnalysisGeneratedAt: Date | null;
   createdAt: Date;
+  legFlightIds: string[];             // multi-city only, ordered by legIndex
+  multiCityTotalPrice: string | null; // DECIMAL — multi-city only
+}
+
+export interface DbSearchLeg {
+  id: string;
+  searchQueryId: string;
+  legIndex: number;
+  originAirport: string;
+  destinationAirport: string;
+  departureDate: Date;
 }

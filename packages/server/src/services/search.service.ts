@@ -1,9 +1,9 @@
 import { query, queryOne } from '../config/database';
 import { searchQueue } from '../jobs/queue';
 import { processSearchJob } from '../jobs/search.job';
-import { SearchRequestInput } from '@flightselect/shared';
+import { SearchRequestInput, TripType } from '@flightselect/shared';
 import { logger } from '../utils/logger';
-import { DbSearchQuery, DbFlight, DbComparison } from '../types/db';
+import { DbSearchQuery, DbFlight, DbComparison, DbSearchLeg } from '../types/db';
 
 export class SearchService {
   async createSearch(input: SearchRequestInput): Promise<{ searchQueryId: string }> {
@@ -35,6 +35,20 @@ export class SearchService {
       ]
     );
 
+    if (input.tripType === TripType.MULTI_CITY && input.legs) {
+      await Promise.all(
+        input.legs.map((leg, legIndex) =>
+          query(
+            `INSERT INTO "SearchLeg" (
+              id, "searchQueryId", "legIndex", "originAirport", "destinationAirport", "departureDate"
+            ) VALUES ($1, $2, $3, $4, $5, $6)`,
+            [crypto.randomUUID(), id, legIndex, leg.originAirport, leg.destinationAirport, new Date(leg.departureDate)]
+          )
+        )
+      );
+      logger.info(`Saved ${input.legs.length} legs for multi-city query: ${id}`);
+    }
+
     try {
       await searchQueue.add('search', { searchQueryId: id });
       logger.info(`Queued search job for query: ${id}`);
@@ -55,7 +69,7 @@ export class SearchService {
     );
     if (!searchQuery) return null;
 
-    const [flights, comparisons] = await Promise.all([
+    const [flights, comparisons, legs] = await Promise.all([
       query<DbFlight>(
         'SELECT * FROM "Flight" WHERE "searchQueryId" = $1 ORDER BY price ASC',
         [searchQueryId]
@@ -64,9 +78,12 @@ export class SearchService {
         'SELECT * FROM "Comparison" WHERE "searchQueryId" = $1 ORDER BY "createdAt" DESC LIMIT 1',
         [searchQueryId]
       ),
+      searchQuery.tripType === TripType.MULTI_CITY
+        ? query<DbSearchLeg>('SELECT * FROM "SearchLeg" WHERE "searchQueryId" = $1 ORDER BY "legIndex" ASC', [searchQueryId])
+        : Promise.resolve([]),
     ]);
 
-    return { ...searchQuery, flights, comparisons };
+    return { ...searchQuery, flights, comparisons, legs };
   }
 }
 

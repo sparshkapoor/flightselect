@@ -9,13 +9,21 @@ export class ComparisonService {
     );
     if (!comparison) return null;
 
-    const [roundTripFlights, oneWayOutboundFlights, oneWayReturnFlights] = await Promise.all([
+    const [roundTripFlights, oneWayOutboundFlights, oneWayReturnFlights, legFlightsUnordered] = await Promise.all([
       query<DbFlight>('SELECT * FROM "Flight" WHERE id = ANY($1)', [comparison.roundTripFlightIds]),
       query<DbFlight>('SELECT * FROM "Flight" WHERE id = ANY($1)', [comparison.oneWayOutboundFlightIds]),
       query<DbFlight>('SELECT * FROM "Flight" WHERE id = ANY($1)', [comparison.oneWayReturnFlightIds]),
+      query<DbFlight>('SELECT * FROM "Flight" WHERE id = ANY($1)', [comparison.legFlightIds ?? []]),
     ]);
 
-    return { comparison, roundTripFlights, oneWayOutboundFlights, oneWayReturnFlights };
+    // `id = ANY($1)` doesn't preserve input order — re-sort to match legFlightIds
+    // (already legIndex-ordered), since leg presentation order matters to the client.
+    const legOrder = comparison.legFlightIds ?? [];
+    const legFlights = legOrder
+      .map((id) => legFlightsUnordered.find((f) => f.id === id))
+      .filter((f): f is DbFlight => Boolean(f));
+
+    return { comparison, roundTripFlights, oneWayOutboundFlights, oneWayReturnFlights, legFlights };
   }
 
   async getComparisonsByQuery(searchQueryId: string) {

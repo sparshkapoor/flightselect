@@ -1,10 +1,56 @@
 import { query, queryOne } from '../config/database';
 import { logger } from '../utils/logger';
-import { RecommendedOption } from '@flightselect/shared';
-import { DbSearchQuery, DbFlight } from '../types/db';
+import { RecommendedOption, TripType } from '@flightselect/shared';
+import { DbSearchQuery, DbFlight, DbSearchLeg } from '../types/db';
 
 export interface ComparisonJobData {
   searchQueryId: string;
+}
+
+// Multi-city: cheapest flight per leg, summed. Simpler than the round-trip vs
+// mix-and-match tradeoff above — there's no airline-bundling decision to make,
+// each leg is independently the cheapest flight tagged to it.
+async function processMultiCityComparison(searchQueryId: string, flights: DbFlight[]): Promise<void> {
+  const legs = await query<DbSearchLeg>(
+    'SELECT * FROM "SearchLeg" WHERE "searchQueryId" = $1 ORDER BY "legIndex" ASC',
+    [searchQueryId]
+  );
+  if (legs.length === 0) {
+    logger.warn(`No legs found for multi-city comparison: ${searchQueryId}`);
+    return;
+  }
+
+  const legFlightIds: string[] = [];
+  let total = 0;
+  for (const leg of legs) {
+    const legFlights = flights
+      .filter((f) => f.searchLegId === leg.id)
+      .sort((a, b) => Number(a.price) - Number(b.price));
+    const cheapest = legFlights[0];
+    if (!cheapest) {
+      logger.warn(`No flights found for leg ${leg.legIndex} of ${searchQueryId} — skipping comparison`);
+      return;
+    }
+    legFlightIds.push(cheapest.id);
+    total += Number(cheapest.price);
+  }
+
+  await query(
+    `INSERT INTO "Comparison" (
+      id, "searchQueryId", "roundTripFlightIds", "oneWayOutboundFlightIds", "oneWayReturnFlightIds",
+      "roundTripTotalPrice", "oneWayTotalPrice", "priceDifference", "recommendedOption",
+      "aiAnalysis", "aiAnalysisGeneratedAt", "legFlightIds", "multiCityTotalPrice"
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+    [
+      crypto.randomUUID(), searchQueryId,
+      [], [], [],
+      null, null, null,
+      RecommendedOption.MULTI_CITY, null, null,
+      legFlightIds, total,
+    ]
+  );
+
+  logger.info(`Multi-city comparison created for query: ${searchQueryId} (${legs.length} legs, total $${total})`);
 }
 
 export async function processComparisonJob(data: ComparisonJobData): Promise<void> {
@@ -20,6 +66,10 @@ export async function processComparisonJob(data: ComparisonJobData): Promise<voi
   if (!searchQuery || flights.length === 0) {
     logger.warn(`No data found for comparison: ${searchQueryId}`);
     return;
+  }
+
+  if (searchQuery.tripType === TripType.MULTI_CITY) {
+    return processMultiCityComparison(searchQueryId, flights);
   }
 
   const outboundFlights = flights
@@ -43,13 +93,14 @@ export async function processComparisonJob(data: ComparisonJobData): Promise<voi
       `INSERT INTO "Comparison" (
         id, "searchQueryId", "roundTripFlightIds", "oneWayOutboundFlightIds", "oneWayReturnFlightIds",
         "roundTripTotalPrice", "oneWayTotalPrice", "priceDifference", "recommendedOption",
-        "aiAnalysis", "aiAnalysisGeneratedAt"
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        "aiAnalysis", "aiAnalysisGeneratedAt", "legFlightIds", "multiCityTotalPrice"
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
       [
         crypto.randomUUID(), searchQueryId,
         [], [bestOutbound.id], [],
         null, oneWayPrice, null,
         RecommendedOption.ONE_WAY, null, null,
+        [], null,
       ]
     );
     return;
@@ -90,8 +141,8 @@ export async function processComparisonJob(data: ComparisonJobData): Promise<voi
     `INSERT INTO "Comparison" (
       id, "searchQueryId", "roundTripFlightIds", "oneWayOutboundFlightIds", "oneWayReturnFlightIds",
       "roundTripTotalPrice", "oneWayTotalPrice", "priceDifference", "recommendedOption",
-      "aiAnalysis", "aiAnalysisGeneratedAt"
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      "aiAnalysis", "aiAnalysisGeneratedAt", "legFlightIds", "multiCityTotalPrice"
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
     [
       crypto.randomUUID(), searchQueryId,
       [bestSameAirlineOutbound.id, bestSameAirlineReturn.id],
@@ -99,6 +150,7 @@ export async function processComparisonJob(data: ComparisonJobData): Promise<voi
       [bestOneWayReturn.id],
       roundTripPrice, oneWayPrice, priceDifference, recommendedOption,
       null, null,
+      [], null,
     ]
   );
 
