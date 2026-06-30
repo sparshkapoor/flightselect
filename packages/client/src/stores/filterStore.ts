@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-interface FilterState {
+export interface FilterState {
   maxPrice: number | undefined;
   minPrice: number | undefined;
   maxDurationMinutes: number | undefined;

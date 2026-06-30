@@ -23,6 +23,8 @@ function makeComparison(): Comparison {
     aiAnalysis: null,
     aiAnalysisGeneratedAt: null,
     createdAt: '2026-06-26T00:00:00Z',
+    legFlightIds: [],
+    multiCityTotalPrice: null,
   };
 }
 

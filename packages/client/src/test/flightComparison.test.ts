@@ -66,6 +66,8 @@ const baseComparison: Comparison = {
   aiAnalysis: 'original AI text',
   aiAnalysisGeneratedAt: '2026-06-26T00:00:00Z',
   createdAt: '2026-06-26T00:00:00Z',
+  legFlightIds: [],
+  multiCityTotalPrice: null,
 };
 
 // ── splitFlightsByDirection ───────────────────────────────────────────────────
@@ -178,14 +180,14 @@ describe('computeFilteredComparison', () => {
     // Same-airline pair only: Delta 320+310=630. Mix: United 290 + JetBlue 270=560
     const result = computeFilteredComparison([delta_out, united_out], [delta_ret, jetblue_ret], baseComparison);
     const sameAirlinePrice = Number(result.roundTripTotalPrice);
-    const mixPrice = result.oneWayTotalPrice;
+    const mixPrice = Number(result.oneWayTotalPrice);
     expect(mixPrice).toBeLessThan(sameAirlinePrice);
     expect(result.recommendedOption).toBe(RecommendedOption.ONE_WAY);
   });
 
   it('priceDifference = roundTripTotal - oneWayTotal', () => {
     const result = computeFilteredComparison([delta_out, united_out], [delta_ret, jetblue_ret], baseComparison);
-    expect(result.priceDifference).toBe(Number(result.roundTripTotalPrice) - result.oneWayTotalPrice);
+    expect(result.priceDifference).toBe(Number(result.roundTripTotalPrice) - Number(result.oneWayTotalPrice));
   });
 
   it('airline-filter scenario: only Delta flights → comparison uses Delta prices', () => {

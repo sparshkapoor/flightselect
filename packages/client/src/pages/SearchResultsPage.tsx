@@ -1,16 +1,158 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useSearchResults, useFlights, useComparisons } from '../hooks/useSearch';
-import { useFilterStore } from '../stores/filterStore';
+import { useFilterStore, type FilterState } from '../stores/filterStore';
 import { FilterSidebar } from '../components/filters/FilterSidebar';
 import { ResultsContainer } from '../components/results/ResultsContainer';
 import { ComparisonView } from '../components/comparison/ComparisonView';
+import { MultiCityBundle } from '../components/comparison/MultiCityBundle';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { splitFlightsByDirection, computeFilteredComparison } from '../utils/flightComparison';
+import { useMultiCityBookingUrl } from '../hooks/useMultiCityBookingUrl';
+import { useBatchBookingOptions } from '../hooks/useBatchBookingOptions';
 import type { Flight } from '@flightselect/shared';
 import { TripType } from '@flightselect/shared';
 
 export type SortOption = 'price_asc' | 'price_desc' | 'duration_asc' | 'departure_asc';
+
+function applyFiltersAndSortFor(
+  flights: Flight[],
+  filterStore: FilterState,
+  sortBy: SortOption
+): Flight[] {
+  const filtered = flights.filter((f) => {
+    if (filterStore.maxPrice !== undefined && Number(f.price) > filterStore.maxPrice) return false;
+    if (filterStore.minPrice !== undefined && Number(f.price) < filterStore.minPrice) return false;
+    if (filterStore.maxLayovers !== undefined) {
+      const layoverCount = f.isLayover ? 1 : 0; // best we can do without a count field
+      if (layoverCount > filterStore.maxLayovers) return false;
+    }
+    if (filterStore.selectedAirlines.length > 0 && !filterStore.selectedAirlines.includes(f.airline)) return false;
+    if (filterStore.maxDurationMinutes !== undefined && f.durationMinutes > filterStore.maxDurationMinutes) return false;
+    if (filterStore.departureTimeStart) {
+      const dep = new Date(f.departureTime).toTimeString().slice(0, 5);
+      if (dep < filterStore.departureTimeStart) return false;
+    }
+    if (filterStore.departureTimeEnd) {
+      const dep = new Date(f.departureTime).toTimeString().slice(0, 5);
+      if (dep > filterStore.departureTimeEnd) return false;
+    }
+    return true;
+  });
+
+  const sorted = [...filtered];
+  switch (sortBy) {
+    case 'price_asc':
+      sorted.sort((a, b) => Number(a.price) - Number(b.price));
+      break;
+    case 'price_desc':
+      sorted.sort((a, b) => Number(b.price) - Number(a.price));
+      break;
+    case 'duration_asc':
+      sorted.sort((a, b) => a.durationMinutes - b.durationMinutes);
+      break;
+    case 'departure_asc':
+      sorted.sort((a, b) => new Date(a.departureTime).getTime() - new Date(b.departureTime).getTime());
+      break;
+  }
+  return sorted;
+}
+
+function SortSelect({ sortBy, onChange }: { sortBy: SortOption; onChange: (v: SortOption) => void }) {
+  return (
+    <select
+      value={sortBy}
+      onChange={(e) => onChange(e.target.value as SortOption)}
+      className="text-sm border border-hairline rounded-lg px-3 py-1.5 bg-surface-1 text-ink focus:outline-none focus:ring-2 focus:ring-brand-500/50"
+    >
+      <option value="price_asc">Price: Low to High</option>
+      <option value="price_desc">Price: High to Low</option>
+      <option value="duration_asc">Duration: Shortest</option>
+      <option value="departure_asc">Departure: Earliest</option>
+    </select>
+  );
+}
+
+function MultiCityResults({ searchQueryId, searchData, allFlights, comparisons }: {
+  searchQueryId: string;
+  searchData: NonNullable<ReturnType<typeof useSearchResults>['data']>;
+  allFlights: Flight[];
+  comparisons: ReturnType<typeof useComparisons>['data'];
+}) {
+  const filterStore = useFilterStore();
+  const [sortBy, setSortBy] = useState<SortOption>('price_asc');
+  const [activeLegIndex, setActiveLegIndex] = useState(0);
+
+  useEffect(() => {
+    setActiveLegIndex(0);
+  }, [searchQueryId]);
+
+  const legs = searchData.legs ?? [];
+  const flightsByLeg = useMemo(
+    () => legs.map((leg) => allFlights.filter((f) => f.searchLegId === leg.id)),
+    [legs, allFlights]
+  );
+  const filteredByLeg = useMemo(
+    () => flightsByLeg.map((legFlights) => applyFiltersAndSortFor(legFlights, filterStore, sortBy)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [flightsByLeg, filterStore, sortBy]
+  );
+
+  const comparison = comparisons?.[0] ?? searchData.comparisons?.[0];
+  const legFlights = useMemo(
+    () => (comparison?.legFlightIds ?? []).map((id) => allFlights.find((f) => f.id === id)).filter((f): f is Flight => !!f),
+    [comparison, allFlights]
+  );
+  const legFlightIds = legFlights.map((f) => f.id);
+  const { data: combinedBookingUrl } = useMultiCityBookingUrl(legFlightIds);
+  const { data: batchOptions, isLoading: optionsLoading } = useBatchBookingOptions(legFlightIds);
+  const legOptions = legFlightIds.map((id) => batchOptions?.[id]?.options ?? null);
+  const totalPrice = comparison?.multiCityTotalPrice != null ? Number(comparison.multiCityTotalPrice) : 0;
+
+  const activeFlights = filteredByLeg[activeLegIndex] ?? [];
+
+  return (
+    <div className="flex gap-6 items-start">
+      <FilterSidebar flights={flightsByLeg[activeLegIndex] ?? []} />
+      <div className="flex-1 space-y-8">
+        {legFlights.length > 0 && (
+          <div className="animate-fadeInUp">
+            <MultiCityBundle
+              flights={legFlights}
+              totalPrice={totalPrice}
+              combinedBookingUrl={combinedBookingUrl}
+              legOptions={legOptions}
+              optionsLoading={optionsLoading}
+            />
+          </div>
+        )}
+
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="inline-flex items-center gap-1 p-1 bg-surface-1 border border-hairline rounded-full flex-wrap">
+            {legs.map((leg, i) => (
+              <button
+                key={leg.id}
+                onClick={() => setActiveLegIndex(i)}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors duration-150 ${
+                  activeLegIndex === i ? 'bg-surface-2 text-brand-400' : 'text-ink-subtle hover:text-ink-muted'
+                }`}
+              >
+                Flight {i + 1} ({filteredByLeg[i]?.length ?? 0})
+              </button>
+            ))}
+          </div>
+          <SortSelect sortBy={sortBy} onChange={setSortBy} />
+        </div>
+
+        <ResultsContainer
+          key={`leg-${activeLegIndex}`}
+          flights={activeFlights}
+          title={`${activeFlights.length} flights — ${legs[activeLegIndex]?.originAirport} → ${legs[activeLegIndex]?.destinationAirport}`}
+        />
+      </div>
+    </div>
+  );
+}
 
 export function SearchResultsPage() {
   const { searchQueryId } = useParams<{ searchQueryId: string }>();
@@ -31,6 +173,7 @@ export function SearchResultsPage() {
   const originAirport = searchData?.originAirport ?? '';
   const destinationAirport = searchData?.destinationAirport ?? '';
   const isRoundTrip = searchData?.tripType === TripType.ROUND_TRIP;
+  const isMultiCity = searchData?.tripType === TripType.MULTI_CITY;
 
   const { outbound: outboundFlights, return: returnFlights } = useMemo(
     () => splitFlightsByDirection(allFlights, originAirport, destinationAirport),
@@ -69,53 +212,14 @@ export function SearchResultsPage() {
     searchData?.status === 'PENDING' ||
     (!searchDone && (searchFetching || flightsFetching));
 
-  function applyFiltersAndSort(flights: Flight[]): Flight[] {
-    const filtered = flights.filter((f) => {
-      if (filterStore.maxPrice !== undefined && Number(f.price) > filterStore.maxPrice) return false;
-      if (filterStore.minPrice !== undefined && Number(f.price) < filterStore.minPrice) return false;
-      if (filterStore.maxLayovers !== undefined) {
-        const layoverCount = f.isLayover ? 1 : 0; // best we can do without a count field
-        if (layoverCount > filterStore.maxLayovers) return false;
-      }
-      if (filterStore.selectedAirlines.length > 0 && !filterStore.selectedAirlines.includes(f.airline)) return false;
-      if (filterStore.maxDurationMinutes !== undefined && f.durationMinutes > filterStore.maxDurationMinutes) return false;
-      if (filterStore.departureTimeStart) {
-        const dep = new Date(f.departureTime).toTimeString().slice(0, 5);
-        if (dep < filterStore.departureTimeStart) return false;
-      }
-      if (filterStore.departureTimeEnd) {
-        const dep = new Date(f.departureTime).toTimeString().slice(0, 5);
-        if (dep > filterStore.departureTimeEnd) return false;
-      }
-      return true;
-    });
-
-    const sorted = [...filtered];
-    switch (sortBy) {
-      case 'price_asc':
-        sorted.sort((a, b) => Number(a.price) - Number(b.price));
-        break;
-      case 'price_desc':
-        sorted.sort((a, b) => Number(b.price) - Number(a.price));
-        break;
-      case 'duration_asc':
-        sorted.sort((a, b) => a.durationMinutes - b.durationMinutes);
-        break;
-      case 'departure_asc':
-        sorted.sort((a, b) => new Date(a.departureTime).getTime() - new Date(b.departureTime).getTime());
-        break;
-    }
-    return sorted;
-  }
-
   const filteredAndSortedFlights = useMemo(
-    () => applyFiltersAndSort(outboundFlights),
+    () => applyFiltersAndSortFor(outboundFlights, filterStore, sortBy),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [outboundFlights, filterStore, sortBy]
   );
 
   const filteredAndSortedReturnFlights = useMemo(
-    () => applyFiltersAndSort(returnFlights),
+    () => applyFiltersAndSortFor(returnFlights, filterStore, sortBy),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [returnFlights, filterStore, sortBy]
   );
@@ -142,6 +246,13 @@ export function SearchResultsPage() {
           <div className="text-4xl mb-4">No flights found</div>
           <p className="text-lg">Try adjusting your search — different dates, airports, or fewer filters.</p>
         </div>
+      ) : isMultiCity && searchData ? (
+        <MultiCityResults
+          searchQueryId={searchQueryId ?? ''}
+          searchData={searchData}
+          allFlights={allFlights}
+          comparisons={comparisons}
+        />
       ) : (
         <div className="flex gap-6 items-start">
           <FilterSidebar flights={outboundFlights} />
@@ -155,13 +266,13 @@ export function SearchResultsPage() {
                 comparison={activeComparison}
                 roundTripFlights={activeComparison.roundTripFlightIds?.map((id: string) =>
                   allFlights.find((f) => f.id === id)
-                ).filter(Boolean) ?? []}
+                ).filter((f): f is Flight => !!f) ?? []}
                 oneWayOutboundFlights={activeComparison.oneWayOutboundFlightIds?.map((id: string) =>
                   allFlights.find((f) => f.id === id)
-                ).filter(Boolean) ?? []}
+                ).filter((f): f is Flight => !!f) ?? []}
                 oneWayReturnFlights={activeComparison.oneWayReturnFlightIds?.map((id: string) =>
                   allFlights.find((f) => f.id === id)
-                ).filter(Boolean) ?? []}
+                ).filter((f): f is Flight => !!f) ?? []}
                 allOutboundFlights={outboundFlights}
                 allReturnFlights={returnFlights}
               />
@@ -193,16 +304,7 @@ export function SearchResultsPage() {
                   {filteredAndSortedFlights.length} of {outboundFlights.length} flights
                 </span>
               )}
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as SortOption)}
-                className="text-sm border border-hairline rounded-lg px-3 py-1.5 bg-surface-1 text-ink focus:outline-none focus:ring-2 focus:ring-brand-500/50"
-              >
-                <option value="price_asc">Price: Low to High</option>
-                <option value="price_desc">Price: High to Low</option>
-                <option value="duration_asc">Duration: Shortest</option>
-                <option value="departure_asc">Departure: Earliest</option>
-              </select>
+              <SortSelect sortBy={sortBy} onChange={setSortBy} />
             </div>
 
             {isRoundTrip && returnFlights.length > 0 ? (
