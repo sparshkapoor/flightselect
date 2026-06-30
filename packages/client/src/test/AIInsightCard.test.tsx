@@ -25,6 +25,7 @@ function makeComparison(): Comparison {
     createdAt: '2026-06-26T00:00:00Z',
     legFlightIds: [],
     multiCityTotalPrice: null,
+    sameAirlineAvailable: true,
   };
 }
 

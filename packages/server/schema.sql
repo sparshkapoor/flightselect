@@ -36,16 +36,7 @@ CREATE TABLE IF NOT EXISTS "SearchQuery" (
     "preferredLayoverAirports"  TEXT[],
     "avoidedAirlines"           TEXT[],
     "preferredAirlines"         TEXT[],
-    "flexibleDates"             BOOLEAN        NOT NULL DEFAULT false,
-    "flexibleDateRangeDays"     INTEGER,
-    "includeNearbyAirports"     BOOLEAN        NOT NULL DEFAULT false,
-    "nearbyRadiusMiles"         INTEGER,
-    "status"                    "SearchStatus" NOT NULL DEFAULT 'PENDING',
-    "createdAt"                 TIMESTAMP(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "userId"                    TEXT           REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE
-);
-ALTER TABLE "SearchQuery" ADD COLUMN IF NOT EXISTS "includeNearbyAirports" BOOLEAN NOT NULL DEFAULT false;
-ALTER TABLE "SearchQuery" ADD COLUMN IF NOT EXISTS "nearbyRadiusMiles" INTEGER;
+
 
 -- Multi-city only: one row per leg of the trip (always one-way). Flight rows belonging to
 -- a leg reference it via Flight.searchLegId — necessary because a multi-city trip can repeat
@@ -103,6 +94,12 @@ CREATE TABLE IF NOT EXISTS "Comparison" (
 );
 ALTER TABLE "Comparison" ADD COLUMN IF NOT EXISTS "legFlightIds" TEXT[];
 ALTER TABLE "Comparison" ADD COLUMN IF NOT EXISTS "multiCityTotalPrice" DECIMAL(65,30);
+
+-- True only when a genuine same-airline round-trip pairing exists. When false,
+-- roundTripFlightIds still holds a fallback pairing (so downstream code never
+-- sees an empty array) but it's identical to the one-way/best-mix pairing —
+-- the client uses this flag to avoid presenting two cards with duplicate data.
+ALTER TABLE "Comparison" ADD COLUMN IF NOT EXISTS "sameAirlineAvailable" BOOLEAN NOT NULL DEFAULT TRUE;
 
 -- Round-trip pricing is not always derivable (e.g. no return flights for the route) — nullable
 -- so that case can be represented honestly instead of inventing a number. Idempotent for

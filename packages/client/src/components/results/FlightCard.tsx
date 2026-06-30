@@ -16,6 +16,9 @@ interface FlightCardProps {
   /** Required when mode === 'eager' — fetched once for the whole view by the parent. */
   eagerOptions?: BookingOption[] | null;
   eagerLoading?: boolean;
+  /** Set only when eagerOptions resolved to empty — distinguishes a genuine
+   *  "no sellers" result (undefined) from a reason it couldn't be checked. */
+  eagerMessage?: string;
   /** How many OTHER flights in this leg's list tie this flight's price. */
   tiedCount?: number;
 }
@@ -27,6 +30,7 @@ export function FlightCard({
   mode = 'lazy',
   eagerOptions = null,
   eagerLoading = false,
+  eagerMessage,
   tiedCount = 0,
 }: FlightCardProps) {
   const eager = mode === 'eager';
@@ -80,8 +84,9 @@ export function FlightCard({
         layoverDurationMinutes={flight.layoverDurationMinutes}
       />
 
-      {/* Price + actions */}
-      <div className="text-right shrink-0 flex flex-col items-end gap-0.5">
+      {/* Price + actions — capped so a long booking-options message can never
+          shrink the sibling FlightTimeline (flex-1) by growing this column. */}
+      <div className="text-right shrink-0 max-w-[40%] flex flex-col items-end gap-0.5">
         <PriceTag amount={Number(flight.price)} currency={flight.currency} />
         <div className="text-xs text-ink-faint">{CABIN_CLASS_LABELS[flight.cabinClass]} · one-way</div>
         {tiedCount > 0 && (
@@ -90,9 +95,8 @@ export function FlightCard({
 
         {eager ? (
           <div className="mt-1.5 w-full space-y-1.5">
-            {/* Skeleton for the still-loading seller options — never gates the
-                Google Flights link below, which is available immediately. */}
-            {loadingOptions && <div className="h-7 skeleton" />}
+            {/* Never gates the Google Flights link below, which is available immediately. */}
+            {loadingOptions && <div className="text-xs text-ink-faint text-right">Checking sellers...</div>}
             {!loadingOptions && bookingOptions !== null && bookingOptions.length > 0 && (
               <div className="space-y-1 text-left">
                 {bookingOptions.map((opt, i) => (
@@ -117,12 +121,17 @@ export function FlightCard({
                 Or check Google Flights
               </button>
             ) : (
-              <button
-                onClick={handleBookingClick}
-                className="text-xs text-brand-400 hover:text-brand-300 font-semibold hover:underline"
-              >
-                Book on Google Flights →
-              </button>
+              <>
+                {!loadingOptions && bookingOptions !== null && (
+                  <div className="text-xs text-ink-faint whitespace-normal">{eagerMessage ?? 'No sellers found'}</div>
+                )}
+                <button
+                  onClick={handleBookingClick}
+                  className="text-xs text-brand-400 hover:text-brand-300 font-semibold hover:underline"
+                >
+                  Book on Google Flights →
+                </button>
+              </>
             )}
           </div>
         ) : (
@@ -133,11 +142,11 @@ export function FlightCard({
               className="mt-1.5 text-xs text-brand-400 hover:text-brand-300 font-semibold hover:underline disabled:opacity-50"
             >
               {loadingOptions
-                ? 'Loading...'
+                ? 'Checking sellers...'
                 : bookingOptions !== null && bookingOptions.length > 0
                 ? 'Sellers loaded'
                 : bookingOptions !== null && bookingOptions.length === 0 && optionsError
-                ? 'Unavailable'
+                ? 'Error checking sellers'
                 : bookingOptions !== null && bookingOptions.length === 0
                 ? 'No sellers found'
                 : 'View booking options'}
@@ -168,7 +177,7 @@ export function FlightCard({
           </>
         )}
         {optionsError && (
-          <div className="mt-1 text-xs text-ink-faint">{optionsError}</div>
+          <div className="mt-1 text-xs text-ink-faint whitespace-normal">{optionsError}</div>
         )}
       </div>
     </div>

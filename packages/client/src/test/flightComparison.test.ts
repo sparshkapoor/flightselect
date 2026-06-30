@@ -68,6 +68,7 @@ const baseComparison: Comparison = {
   createdAt: '2026-06-26T00:00:00Z',
   legFlightIds: [],
   multiCityTotalPrice: null,
+  sameAirlineAvailable: true,
 };
 
 // ── splitFlightsByDirection ───────────────────────────────────────────────────
@@ -187,11 +188,18 @@ describe('computeFilteredComparison', () => {
     expect(result.oneWayReturnFlightIds).toEqual(['j1']);
   });
 
-  it('falls back to cheapest overall pair when no same-airline match', () => {
+  it('falls back to cheapest overall pair when no same-airline match, and flags sameAirlineAvailable false', () => {
     // Only Delta outbound, only JetBlue return — no match
     const result = computeFilteredComparison([delta_out], [jetblue_ret], baseComparison);
     expect(result.roundTripTotalPrice).toBe(320 + 270);
     expect(result.roundTripFlightIds).toEqual(['d1', 'j1']);
+    expect(result.sameAirlineAvailable).toBe(false);
+  });
+
+  it('flags sameAirlineAvailable true when a genuine same-airline pair exists', () => {
+    const united_ret = makeFlight({ id: 'u2', airline: 'United', departureAirport: 'SFO', arrivalAirport: 'EWR', price: 220 });
+    const result = computeFilteredComparison([delta_out, united_out], [delta_ret, united_ret], baseComparison);
+    expect(result.sameAirlineAvailable).toBe(true);
   });
 
   it('sets recommendedOption to ROUND_TRIP when same-airline <= mix', () => {

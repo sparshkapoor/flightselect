@@ -153,8 +153,8 @@ export async function processComparisonJob(data: ComparisonJobData): Promise<voi
     `INSERT INTO "Comparison" (
       id, "searchQueryId", "roundTripFlightIds", "oneWayOutboundFlightIds", "oneWayReturnFlightIds",
       "roundTripTotalPrice", "oneWayTotalPrice", "priceDifference", "recommendedOption",
-      "aiAnalysis", "aiAnalysisGeneratedAt", "legFlightIds", "multiCityTotalPrice"
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+      "aiAnalysis", "aiAnalysisGeneratedAt", "legFlightIds", "multiCityTotalPrice", "sameAirlineAvailable"
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
     [
       crypto.randomUUID(), searchQueryId,
       [bestSameAirlineOutbound.id, bestSameAirlineReturn.id],
@@ -162,7 +162,7 @@ export async function processComparisonJob(data: ComparisonJobData): Promise<voi
       [bestOneWayReturn.id],
       roundTripPrice, oneWayPrice, priceDifference, recommendedOption,
       null, null,
-      [], null,
+      [], null, hasSameAirline,
     ]
   );
 

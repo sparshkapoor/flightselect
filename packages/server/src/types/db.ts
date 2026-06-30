@@ -68,6 +68,7 @@ export interface DbComparison {
   createdAt: Date;
   legFlightIds: string[];             // multi-city only, ordered by legIndex
   multiCityTotalPrice: string | null; // DECIMAL — multi-city only
+  sameAirlineAvailable: boolean;
 }
 
 export interface DbSearchLeg {

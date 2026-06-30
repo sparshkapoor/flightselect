@@ -18,16 +18,24 @@ export function formatDurationMinutes(minutes: number): string {
 // Flight times are wall-clock time at the departure/arrival airport, stored
 // as a naive timestamp with no real timezone conversion applied anywhere in
 // the pipeline (scraper -> DB -> API all pass the digits through as-is, just
-// labeled UTC in transit). Formatting with the viewer's local timezone would
-// re-interpret those digits and show the wrong clock time — read the UTC
-// fields directly instead, which yields the original, correct digits.
-export function formatTime(dateStr: string): string {
+// labeled UTC in transit). Reading with the viewer's local timezone (e.g.
+// `Date.toTimeString()`) would re-interpret those digits and produce the
+// wrong clock time — always read the UTC fields directly instead, which
+// yields the original, correct digits. Any code comparing or displaying
+// flight times must go through this function, not `Date` local-time methods.
+export function getLocalHHMM(dateStr: string): string {
   const d = new Date(dateStr);
   const hours = d.getUTCHours();
   const minutes = d.getUTCMinutes();
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+export function formatTime(dateStr: string): string {
+  const [hourStr, minuteStr] = getLocalHHMM(dateStr).split(':');
+  const hours = Number(hourStr);
   const period = hours >= 12 ? 'PM' : 'AM';
   const displayHours = hours % 12 === 0 ? 12 : hours % 12;
-  return `${displayHours}:${String(minutes).padStart(2, '0')} ${period}`;
+  return `${displayHours}:${minuteStr} ${period}`;
 }
 
 const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

@@ -13,6 +13,10 @@ interface RoundTripBundleProps {
   outboundOptions: BookingOption[] | null;
   returnOptions: BookingOption[] | null;
   optionsLoading: boolean;
+  /** Set only when options resolved to empty — distinguishes a genuine "no
+   *  sellers" result (undefined) from a reason it couldn't be checked. */
+  outboundMessage?: string;
+  returnMessage?: string;
   /** How many OTHER flights on this leg tie the shown flight's price. */
   outboundTiedCount?: number;
   returnTiedCount?: number;
@@ -23,15 +27,17 @@ interface LegRowProps {
   direction: 'Outbound' | 'Return';
   options: BookingOption[] | null;
   loading: boolean;
+  message?: string;
   tiedCount?: number;
 }
 
-function LegRow({ flight, direction, options, loading, tiedCount = 0 }: LegRowProps) {
+function LegRow({ flight, direction, options, loading, message, tiedCount = 0 }: LegRowProps) {
   const handleViewGoogle = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (flight.bookingUrl) window.open(flight.bookingUrl, '_blank', 'noopener,noreferrer');
   };
   const topOption = options && options.length > 0 ? options[0] : null;
+  const checked = !loading && options !== null;
 
   return (
     <div className="px-2 py-3 flex items-center gap-4">
@@ -58,7 +64,7 @@ function LegRow({ flight, direction, options, loading, tiedCount = 0 }: LegRowPr
           </span>
         )}
         {loading ? (
-          <div className="h-3 w-20 skeleton mt-0.5" />
+          <div className="text-xs text-ink-faint">Checking sellers...</div>
         ) : topOption ? (
           <a
             href={topOption.url}
@@ -70,12 +76,17 @@ function LegRow({ flight, direction, options, loading, tiedCount = 0 }: LegRowPr
             Book on {topOption.seller} →
           </a>
         ) : (
-          <button
-            onClick={handleViewGoogle}
-            className="text-xs text-ink-faint hover:text-ink-cool underline-offset-2 hover:underline"
-          >
-            View on Google Flights
-          </button>
+          <>
+            {checked && (
+              <div className="text-xs text-ink-faint">{message ?? 'No sellers found'}</div>
+            )}
+            <button
+              onClick={handleViewGoogle}
+              className="text-xs text-ink-faint hover:text-ink-cool underline-offset-2 hover:underline"
+            >
+              View on Google Flights
+            </button>
+          </>
         )}
       </div>
     </div>
@@ -92,6 +103,8 @@ export function RoundTripBundle({
   outboundOptions,
   returnOptions,
   optionsLoading,
+  outboundMessage,
+  returnMessage,
   outboundTiedCount = 0,
   returnTiedCount = 0,
 }: RoundTripBundleProps) {
@@ -146,7 +159,7 @@ export function RoundTripBundle({
 
       {/* Legs */}
       <div className="divide-y divide-hairline -mx-2">
-        <LegRow flight={outboundFlight} direction="Outbound" options={outboundOptions} loading={optionsLoading} tiedCount={outboundTiedCount} />
+        <LegRow flight={outboundFlight} direction="Outbound" options={outboundOptions} loading={optionsLoading} message={outboundMessage} tiedCount={outboundTiedCount} />
         {returnFlight && (
           <>
             <div className="flex items-center justify-center py-1 relative -my-3">
@@ -156,7 +169,7 @@ export function RoundTripBundle({
                 </svg>
               </div>
             </div>
-            <LegRow flight={returnFlight} direction="Return" options={returnOptions} loading={optionsLoading} tiedCount={returnTiedCount} />
+            <LegRow flight={returnFlight} direction="Return" options={returnOptions} loading={optionsLoading} message={returnMessage} tiedCount={returnTiedCount} />
           </>
         )}
       </div>

@@ -72,7 +72,7 @@ def _ym(value: str) -> str:
 def query_knowledge(
     itinerary_summary: str,
     airlines: list[str] | None = None,
-    n_results: int = 3,
+    n_results: int = 5,
     today: date | None = None,
 ) -> dict:
     """Retrieve soft-factor knowledge and synthesize a grounded insight.

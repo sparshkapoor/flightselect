@@ -8,6 +8,7 @@ import { ComparisonView } from '../components/comparison/ComparisonView';
 import { MultiCityBundle } from '../components/comparison/MultiCityBundle';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { splitFlightsByDirection, computeFilteredComparison, hasActiveFilters } from '../utils/flightComparison';
+import { getLocalHHMM } from '../utils/formatters';
 import { useMultiCityBookingUrl } from '../hooks/useMultiCityBookingUrl';
 import { useBatchBookingOptions } from '../hooks/useBatchBookingOptions';
 import type { Flight } from '@flightselect/shared';
@@ -30,11 +31,11 @@ function applyFiltersAndSortFor(
     if (filterStore.selectedAirlines.length > 0 && !filterStore.selectedAirlines.includes(f.airline)) return false;
     if (filterStore.maxDurationMinutes !== undefined && f.durationMinutes > filterStore.maxDurationMinutes) return false;
     if (filterStore.departureTimeStart) {
-      const dep = new Date(f.departureTime).toTimeString().slice(0, 5);
+      const dep = getLocalHHMM(f.departureTime);
       if (dep < filterStore.departureTimeStart) return false;
     }
     if (filterStore.departureTimeEnd) {
-      const dep = new Date(f.departureTime).toTimeString().slice(0, 5);
+      const dep = getLocalHHMM(f.departureTime);
       if (dep > filterStore.departureTimeEnd) return false;
     }
     return true;

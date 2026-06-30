@@ -11,6 +11,10 @@ interface MixAndMatchSectionProps {
   outboundOptions: BookingOption[] | null;
   returnOptions: BookingOption[] | null;
   optionsLoading: boolean;
+  /** Set only when options resolved to empty — distinguishes a genuine "no
+   *  sellers" result (undefined) from a reason it couldn't be checked. */
+  outboundMessage?: string;
+  returnMessage?: string;
   /** How many OTHER flights on this leg tie the shown flight's price. */
   outboundTiedCount?: number;
   returnTiedCount?: number;
@@ -28,6 +32,8 @@ export function MixAndMatchSection({
   outboundOptions,
   returnOptions,
   optionsLoading,
+  outboundMessage,
+  returnMessage,
   outboundTiedCount = 0,
   returnTiedCount = 0,
   hero = false,
@@ -64,8 +70,8 @@ export function MixAndMatchSection({
         </div>
       )}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <FlightCard flight={outboundFlight} mode="eager" eagerOptions={outboundOptions} eagerLoading={optionsLoading} tiedCount={outboundTiedCount} />
-        <FlightCard flight={returnFlight} mode="eager" eagerOptions={returnOptions} eagerLoading={optionsLoading} tiedCount={returnTiedCount} />
+        <FlightCard flight={outboundFlight} mode="eager" eagerOptions={outboundOptions} eagerLoading={optionsLoading} eagerMessage={outboundMessage} tiedCount={outboundTiedCount} />
+        <FlightCard flight={returnFlight} mode="eager" eagerOptions={returnOptions} eagerLoading={optionsLoading} eagerMessage={returnMessage} tiedCount={returnTiedCount} />
       </div>
     </div>
   );

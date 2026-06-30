@@ -120,6 +120,44 @@ describe('processComparisonJob', () => {
     expect(roundTripTotalPrice).toBe(380); // real same-airline combo, not a multiplier
     expect(priceDifference).not.toBeNull();
   });
+
+  it('flags sameAirlineAvailable false when every outbound/return pairing is cross-airline', async () => {
+    queryOneMock.mockResolvedValue(makeSearchQuery({ tripType: 'ROUND_TRIP', returnDate: new Date('2026-07-08') }));
+    queryMock.mockImplementation((sql: string) => {
+      if (String(sql).startsWith('SELECT * FROM "Flight"')) {
+        return Promise.resolve([
+          makeFlight({ id: 'out-1', price: '200.00', airline: 'Frontier' }),
+          makeFlight({ id: 'ret-1', price: '180.00', airline: 'Spirit', departureAirport: 'SFO', arrivalAirport: 'EWR' }),
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    await processComparisonJob({ searchQueryId: 'sq1' });
+
+    const params = getInsertedComparisonParams();
+    const sameAirlineAvailable = params[params.length - 1];
+    expect(sameAirlineAvailable).toBe(false);
+  });
+
+  it('flags sameAirlineAvailable true when a genuine same-airline pairing exists', async () => {
+    queryOneMock.mockResolvedValue(makeSearchQuery({ tripType: 'ROUND_TRIP', returnDate: new Date('2026-07-08') }));
+    queryMock.mockImplementation((sql: string) => {
+      if (String(sql).startsWith('SELECT * FROM "Flight"')) {
+        return Promise.resolve([
+          makeFlight({ id: 'out-1', price: '200.00', airline: 'Delta' }),
+          makeFlight({ id: 'ret-1', price: '180.00', airline: 'Delta', departureAirport: 'SFO', arrivalAirport: 'EWR' }),
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    await processComparisonJob({ searchQueryId: 'sq1' });
+
+    const params = getInsertedComparisonParams();
+    const sameAirlineAvailable = params[params.length - 1];
+    expect(sameAirlineAvailable).toBe(true);
+  });
 });
 
 describe('processComparisonJob — nearby airports', () => {

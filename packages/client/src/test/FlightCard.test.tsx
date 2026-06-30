@@ -35,7 +35,7 @@ describe('FlightCard booking options (lazy mode)', () => {
     vi.unstubAllGlobals();
   });
 
-  it('reaches a terminal "Unavailable" state on a definitive failure message and never re-fetches on a second click', async () => {
+  it('reaches a terminal "Error checking sellers" state on a definitive failure message and never re-fetches on a second click', async () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
       json: async () => ({ options: [], message: 'No booking token available for this flight' }),
@@ -45,14 +45,14 @@ describe('FlightCard booking options (lazy mode)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'View booking options' }));
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Unavailable' })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Error checking sellers' })).toBeInTheDocument());
     expect(screen.getByText('No booking token available for this flight')).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledTimes(1);
 
     // Button is disabled once a definitive (even empty) result has been reached,
     // so this click is a no-op — but assert directly that no second network
     // call fires, which is the actual bug this guards against.
-    fireEvent.click(screen.getByRole('button', { name: 'Unavailable' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Error checking sellers' }));
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 

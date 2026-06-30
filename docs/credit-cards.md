@@ -28,6 +28,20 @@ sources:
 
 ---
 
+## Quick Lookup by Airline
+
+The table above embeds poorly against natural-language "what about [airline]" questions — this section restates the same facts as one plain-language sentence per airline so a query naming a specific carrier retrieves the right answer.
+
+- **Delta:** SkyMiles Gold, Platinum, and Reserve Amex cards (all issuers Amex) waive the first checked bag for up to 8 companions on the same booking — the trigger is having your SkyMiles number linked to the card, not paying with it.
+- **United:** United Explorer, Quest, and Club Infinite (all Chase) waive the first checked bag when you pay with the card — Explorer and Quest cover only 1 companion. Direct booking on united.com or the United app is required; third-party OTA bookings (Expedia, Google Flights, Kayak) can void the benefit at check-in.
+- **Alaska:** The Alaska Airlines Visa (BofA) waives the first bag for up to 6 companions on the same booking when you pay with the card.
+- **American (AA):** Citi AAdvantage Platinum Select waives the first bag for up to 4 companions when you pay with the card.
+- **Southwest:** Rapid Rewards Priority/Performance cardholders get 2 free bags for all passengers on the booking automatically (card ownership, no payment condition required) — but as of May 28, 2025 this only applies to Anytime, Business Select, and A-List Preferred fares; Wanna Get Away and WGA+ fares now charge for bags regardless of card.
+- **Any airline (indirect credits, not waivers):** Chase Sapphire Reserve's $300 travel credit and Amex Platinum's $200 airline fee credit can offset bag fees but aren't airline-specific waivers, and don't apply automatically. Capital One Venture X has no bag benefit at all.
+- **Frontier, Spirit, JetBlue, Allegiant, Hawaiian, and other carriers not listed above:** no verified airline-branded baggage waiver for these carriers is in this reference — don't assume one exists without checking the card's current terms.
+
+---
+
 ## Key Corrections (Things Commonly Cited Incorrectly)
 
 **Delta cards trigger via account linkage, not payment.** Your SkyMiles number must be in the booking AND the card linked to that account. You don't have to pay with the Delta Amex — you just have to have it linked. This is more forgiving than United/Alaska/AA which require payment with the card.

@@ -87,7 +87,8 @@ export function computeFilteredComparison(
     }
   }
 
-  if (bestSamePrice === Infinity) {
+  const sameAirlineAvailable = bestSamePrice !== Infinity;
+  if (!sameAirlineAvailable) {
     // No same-airline match — use cheapest overall pair
     bestSamePrice = Number(outbound[0].price) + Number(returnFlights[0].price);
     bestSameOut = outbound[0];
@@ -114,5 +115,6 @@ export function computeFilteredComparison(
     oneWayTotalPrice: mixPrice,
     priceDifference,
     recommendedOption,
+    sameAirlineAvailable,
   };
 }

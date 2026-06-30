@@ -78,6 +78,12 @@ export function ComparisonView({
   const optionsFor = (id: string | undefined): BookingOption[] | null =>
     id ? batchOptions?.[id]?.options ?? null : null;
 
+  // Distinguishes "genuinely no sellers" from "couldn't check" (missing
+  // booking token, SerpAPI error, etc.) once optionsFor resolves to an empty
+  // array — undefined here means a true empty result, not an error.
+  const messageFor = (id: string | undefined): string | undefined =>
+    id ? batchOptions?.[id]?.message : undefined;
+
   const savingsAmount = comparison.priceDifference !== null ? Math.abs(Number(comparison.priceDifference)) : null;
   const isRoundTripCheapest = comparison.recommendedOption === RecommendedOption.ROUND_TRIP;
 
@@ -160,6 +166,7 @@ export function ComparisonView({
             outboundOptions={optionsFor(bestOutbound.id)}
             returnOptions={null}
             optionsLoading={optionsLoading}
+            outboundMessage={messageFor(bestOutbound.id)}
             outboundTiedCount={tiedCountFor(bestOutbound, allOutboundFlights)}
           />
         </div>
@@ -204,7 +211,28 @@ export function ComparisonView({
         </div>
       )}
 
-      {isRoundTripCheapest ? (
+      {!comparison.sameAirlineAvailable ? (
+        <div className="animate-fadeInUp" style={{ animationDelay: '180ms' }}>
+          <RoundTripBundle
+            outboundFlight={rtOutbound}
+            returnFlight={rtReturn}
+            totalPrice={Number(comparison.roundTripTotalPrice)}
+            isCheapest
+            savingsAmount={null}
+            combinedBookingUrl={combinedBookingUrl}
+            outboundOptions={optionsFor(rtOutbound.id)}
+            returnOptions={optionsFor(rtReturn.id)}
+            optionsLoading={optionsLoading}
+            outboundMessage={messageFor(rtOutbound.id)}
+            returnMessage={messageFor(rtReturn.id)}
+            outboundTiedCount={tiedCountFor(rtOutbound, allOutboundFlights)}
+            returnTiedCount={tiedCountFor(rtReturn, allReturnFlights)}
+          />
+          <p className="text-sm text-ink-faint mt-3">
+            All available flights for this route are on {rtOutbound.airline} — no mixed-airline alternative exists to compare.
+          </p>
+        </div>
+      ) : isRoundTripCheapest ? (
         <>
           <div className="animate-fadeInUp" style={{ animationDelay: '180ms' }}>
             <RoundTripBundle
@@ -217,6 +245,8 @@ export function ComparisonView({
               outboundOptions={optionsFor(rtOutbound.id)}
               returnOptions={optionsFor(rtReturn.id)}
               optionsLoading={optionsLoading}
+              outboundMessage={messageFor(rtOutbound.id)}
+              returnMessage={messageFor(rtReturn.id)}
               outboundTiedCount={tiedCountFor(rtOutbound, allOutboundFlights)}
               returnTiedCount={tiedCountFor(rtReturn, allReturnFlights)}
             />
@@ -239,6 +269,8 @@ export function ComparisonView({
                 outboundOptions={optionsFor(oneWayOutboundFlights[0].id)}
                 returnOptions={optionsFor(oneWayReturnFlights[0].id)}
                 optionsLoading={optionsLoading}
+                outboundMessage={messageFor(oneWayOutboundFlights[0].id)}
+                returnMessage={messageFor(oneWayReturnFlights[0].id)}
                 outboundTiedCount={tiedCountFor(oneWayOutboundFlights[0], allOutboundFlights)}
                 returnTiedCount={tiedCountFor(oneWayReturnFlights[0], allReturnFlights)}
               />
@@ -258,6 +290,8 @@ export function ComparisonView({
                 outboundOptions={optionsFor(oneWayOutboundFlights[0].id)}
                 returnOptions={optionsFor(oneWayReturnFlights[0].id)}
                 optionsLoading={optionsLoading}
+                outboundMessage={messageFor(oneWayOutboundFlights[0].id)}
+                returnMessage={messageFor(oneWayReturnFlights[0].id)}
                 outboundTiedCount={tiedCountFor(oneWayOutboundFlights[0], allOutboundFlights)}
                 returnTiedCount={tiedCountFor(oneWayReturnFlights[0], allReturnFlights)}
                 hero
@@ -282,6 +316,8 @@ export function ComparisonView({
               outboundOptions={optionsFor(rtOutbound.id)}
               returnOptions={optionsFor(rtReturn.id)}
               optionsLoading={optionsLoading}
+              outboundMessage={messageFor(rtOutbound.id)}
+              returnMessage={messageFor(rtReturn.id)}
               outboundTiedCount={tiedCountFor(rtOutbound, allOutboundFlights)}
               returnTiedCount={tiedCountFor(rtReturn, allReturnFlights)}
             />
@@ -289,39 +325,41 @@ export function ComparisonView({
         </>
       )}
 
-      <details className="group border-t border-hairline pt-6">
-        <summary className="flex items-center gap-2 text-eyebrow text-ink-subtle hover:text-ink-muted cursor-pointer list-none transition-colors duration-150">
-          <svg
-            className="w-3.5 h-3.5 shrink-0 transition-transform duration-200 group-open:rotate-90"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2.5}
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-          </svg>
-          See full price breakdown
-        </summary>
-        <div className="mt-4 space-y-6 bg-surface-1 border border-hairline rounded-xl p-5">
-          <div>
-            <h3 className="text-h2 text-[1rem] text-ink-muted mb-3">Price Comparison</h3>
-            <PriceComparisonChart
-              roundTripTotal={Number(comparison.roundTripTotalPrice)}
-              oneWayTotal={Number(comparison.oneWayTotalPrice)}
-            />
+      {comparison.sameAirlineAvailable && (
+        <details className="group border-t border-hairline pt-6">
+          <summary className="flex items-center gap-2 text-eyebrow text-ink-subtle hover:text-ink-muted cursor-pointer list-none transition-colors duration-150">
+            <svg
+              className="w-3.5 h-3.5 shrink-0 transition-transform duration-200 group-open:rotate-90"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2.5}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+            See full price breakdown
+          </summary>
+          <div className="mt-4 space-y-6 bg-surface-1 border border-hairline rounded-xl p-5">
+            <div>
+              <h3 className="text-h2 text-[1rem] text-ink-muted mb-3">Price Comparison</h3>
+              <PriceComparisonChart
+                roundTripTotal={Number(comparison.roundTripTotalPrice)}
+                oneWayTotal={Number(comparison.oneWayTotalPrice)}
+              />
+            </div>
+            <div>
+              <h3 className="text-h2 text-[1rem] text-ink-muted mb-3">Detailed Comparison</h3>
+              <ComparisonTable
+                roundTripFlights={roundTripFlights}
+                oneWayOutboundFlights={oneWayOutboundFlights}
+                oneWayReturnFlights={oneWayReturnFlights}
+                roundTripTotal={Number(comparison.roundTripTotalPrice)}
+                oneWayTotal={Number(comparison.oneWayTotalPrice)}
+              />
+            </div>
           </div>
-          <div>
-            <h3 className="text-h2 text-[1rem] text-ink-muted mb-3">Detailed Comparison</h3>
-            <ComparisonTable
-              roundTripFlights={roundTripFlights}
-              oneWayOutboundFlights={oneWayOutboundFlights}
-              oneWayReturnFlights={oneWayReturnFlights}
-              roundTripTotal={Number(comparison.roundTripTotalPrice)}
-              oneWayTotal={Number(comparison.oneWayTotalPrice)}
-            />
-          </div>
-        </div>
-      </details>
+        </details>
+      )}
     </div>
   );
 }

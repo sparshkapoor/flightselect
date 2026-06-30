@@ -90,6 +90,8 @@ export interface Comparison {
   legFlightIds: string[];
   /** Multi-city only: sum of the cheapest flight on each leg. */
   multiCityTotalPrice: number | null;
+  /** False when roundTripFlightIds is a fallback identical to the one-way/best-mix pairing (no genuine same-airline pair exists). */
+  sameAirlineAvailable: boolean;
 }
 
 export interface User {

@@ -2,6 +2,7 @@ import { queryOne } from '../config/database';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
 import { cacheService } from './cache.service';
+import { mapWithConcurrency } from '../utils/concurrency';
 import type { BookingOption } from '@flightselect/shared';
 import { DbFlight } from '../types/db';
 
@@ -10,6 +11,18 @@ import { DbFlight } from '../types/db';
 // savings (free tier: 100 searches/month) when the same already-scraped
 // flight is viewed again (repeat clicks, multiple users, batch eager-load).
 const BOOKING_OPTIONS_CACHE_TTL = 15 * 60;
+
+// This is a synchronous, user-facing wait (the comparison view blocks on it),
+// not a background job — 30s per flight was tolerable for a single lookup but
+// compounds badly across a batch. 12s still gives SerpAPI room to respond
+// without leaving the user staring at a spinner for half a minute.
+const BOOKING_OPTIONS_TIMEOUT_MS = 12_000;
+
+// Caps how many SerpAPI booking-option requests run at once for a single
+// batch. A comparison view requests up to 4 flights at once — running them
+// in parallel (instead of one at a time) cuts wall time roughly 4x, while
+// staying well under SerpAPI's concurrent-request tolerance.
+const BOOKING_OPTIONS_BATCH_CONCURRENCY = 4;
 
 interface SerpApiBookingOption {
   book_with?: string;
@@ -34,17 +47,20 @@ interface SerpApiBookingResponse {
 // which the per-client rate limiter (1 request per window) was never meant
 // to throttle; that limiter exists to pace deliberate, one-at-a-time
 // "view options" clicks, not a single page load showing several flights.
-// Calling getBookingOptions sequentially here still makes one real SerpAPI
-// call per flight (the metered cost is unchanged) — only the per-client
-// throttle is collapsed to one token for the whole batch.
+// getBookingOptions calls still make one real SerpAPI call per flight (the
+// metered cost is unchanged) — only the per-client throttle is collapsed to
+// one token for the whole batch. Fetched with bounded concurrency rather than
+// sequentially so a 4-flight batch takes roughly one request's wall time
+// instead of four.
 export async function getBookingOptionsBatch(
   flightIds: string[]
 ): Promise<Record<string, { options: BookingOption[]; googleFlightsUrl?: string; message?: string }>> {
-  const results: Record<string, { options: BookingOption[]; googleFlightsUrl?: string; message?: string }> = {};
-  for (const id of flightIds) {
-    results[id] = await getBookingOptions(id);
-  }
-  return results;
+  const entries = await mapWithConcurrency(
+    flightIds,
+    BOOKING_OPTIONS_BATCH_CONCURRENCY,
+    async (id) => [id, await getBookingOptions(id)] as const
+  );
+  return Object.fromEntries(entries);
 }
 
 export async function getBookingOptions(
@@ -87,7 +103,7 @@ export async function getBookingOptions(
   });
 
   const res = await fetch(`https://serpapi.com/search.json?${params}`, {
-    signal: AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(BOOKING_OPTIONS_TIMEOUT_MS),
   });
 
   if (!res.ok) {
