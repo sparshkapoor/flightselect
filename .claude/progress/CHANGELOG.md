@@ -912,3 +912,49 @@ Brought up the full `docker compose` stack on `sparsh@server.local` (the user's 
 2. The Ollama model-name mismatch (item 7 above) — user's call on which model to standardize on.
 3. Items 2–4 from session 12's outstanding list are unchanged (EmptyState emoji icons, AdvancedFilters' missing collapse exit transition, blog post screenshots, tfs real-world validation).
 4. The DOT BTS seed's `CITY_TO_IATA` table covers ~150 of the dataset's ~170 distinct metro areas — a handful of very small regional markets were left unmapped (skipped, not guessed) rather than risk a wrong IATA code.
+
+---
+
+## Session 14 (2026-06-30)
+
+### Context
+The user tested session 13 live (their own EWR↔LAS searches) and reported four issues, each re-verified by reading the actual code or live API/page data before planning a fix: (1) no date shown anywhere on the results page, only times; (2) the hero only ever shows one specific flight when several tie at the same price, with no hint there are alternatives; (3) the "flexible dates" (+/- N days) toggle did nothing — confirmed live, every returned flight was on exactly the requested date despite `flexibleDateRangeDays` being set; (4) no multi-city trip support at all, needed for the user's real itinerary (EWR↔LAS Jul 6–19, then EWR↔LAS Jul 27–Aug 13). For (4), the user explicitly asked for an Expedia-style system (add N one-way legs) rather than the smaller "just run two searches" alternative, plus flagged a future (not-this-session) idea: searching a ~100mi radius of an airport to find the true cheapest fare across nearby airports.
+
+### 1. Dates now shown everywhere
+Added `formatFlightDate` (UTC-pinned, same constraint as `formatTime` — the date digits are airport-local, not a real instant) to `formatters.ts`. `FlightTimeline.tsx` now shows the date under each departure/arrival time (necessary, not cosmetic, once flexible dates and multi-city can return flights spanning different days). `ComparisonView.tsx`'s "Your Trip" header gets a route + date-range subtitle derived from the actual chosen flights, not the raw search request.
+
+**Files**: `packages/client/src/utils/formatters.ts`, `packages/client/src/components/results/FlightTimeline.tsx`, `packages/client/src/components/comparison/ComparisonView.tsx`
+
+### 2. Tied-price alternatives surfaced in the hero
+`comparison.job.ts` picks the cheapest flight per leg via a stable sort with no tiebreaker and no count of how many flights tied at that price — confirmed live (7 United flights all at $249, hero showed only one). No backend change needed: the client already fetches the full flight list, so a new `countTiedAtPrice` helper (`utils/flightComparison.ts`) computes the count client-side and a small `+N more at this price` hint renders next to the leg price in `RoundTripBundle`, `MixAndMatchSection`, and `FlightCard`.
+
+**Files**: `packages/client/src/utils/flightComparison.ts`, `packages/client/src/components/comparison/RoundTripBundle.tsx`, `MixAndMatchSection.tsx`, `packages/client/src/components/results/FlightCard.tsx`, `packages/client/src/components/comparison/ComparisonView.tsx`, `packages/client/src/pages/SearchResultsPage.tsx`
+
+### 3. Flexible dates actually search a date range now
+Root cause (confirmed by reading the code, not assumed): `flexibleDates`/`flexibleDateRangeDays` were loaded from the SearchQuery in `search.job.ts` and then never referenced again — dead code, not a filtering bug. Added `buildCandidateDatePairs`, which varies departure and return independently (each held fixed at its originally-requested date) — O(4·rangeDays+1) scraper calls instead of the full O((2·rangeDays+1)²) grid, server-side-clamped to a max of 5 days regardless of what's stored, since each day directly multiplies live scraper cost. Verified live: a ±2-day search on EWR↔LAS returned outbound flights spanning all 5 candidate dates (Jul 4–8) and return flights spanning all 5 (Jul 17–21).
+
+**Files**: `packages/server/src/jobs/search.job.ts`, `search.job.test.ts` (4 new tests, including an exact-date-list assertion)
+
+### 4. Expedia-style multi-city trips
+The largest piece of this session, scoped per the user's explicit direction.
+
+- **Data model**: `TripType.MULTI_CITY` added; a new `SearchLeg` table (`schema.sql` + `prisma/schema.prisma`, kept in sync though only `schema.sql` runs at runtime via the api container's auto-migrate-on-boot entrypoint) — necessary as a real table, not a JSON column, because a trip can repeat the same airport pair on different dates (confirmed: the user's own trip has EWR→LAS twice), so flights can't be disambiguated by `(origin, destination)` alone the way the 2-leg flow does. `Flight.searchLegId` (nullable FK) tags which leg a flight belongs to. `Comparison` gained `legFlightIds`/`multiCityTotalPrice` columns and a `MULTI_CITY` `RecommendedOption` value; `oneWayTotalPrice` relaxed to nullable since multi-city comparisons don't populate it.
+- **Backend orchestration**: `search.job.ts` loops legs (one one-way scrape per leg, reusing the same per-task mechanism Part 3 added for date candidates) instead of a single departure+return call. `comparison.job.ts` picks the cheapest flight per leg and sums — simpler than the round-trip-vs-mix tradeoff, no airline-bundling decision needed.
+- **Booking link — verified against a real captured URL, not guessed**: drove a real headless browser through Google Flights' own multi-city UI (switched trip type, filled 3 legs via keyboard-driven autocomplete after several rounds of fighting Google's DOM — a plain click landed on the wrong element and silently swapped two fields before keyboard-only selection proved reliable), captured the actual issued `tfs` URL, and hand-decoded its protobuf. This caught a real bug before it shipped: trip-type field 19 is **3** for multi-city, not **1** (round-trip) as a naive extrapolation from the existing 2-leg builder would have produced. `buildGoogleFlightsMultiCityTfsUrl` (`googleFlightsUrl.ts`) generalizes the existing per-leg byte-builder (unchanged, already verified in an earlier session) to N repeated leg entries with the now-confirmed field-19 value; a new test decodes the generated tfs and asserts on it. A `/flights/multi-city-booking-url` endpoint mirrors the existing round-trip one.
+- **Frontend**: exposed the trip-type selector for the first time — `SearchForm.tsx` was previously hard-coded to `ROUND_TRIP` with the selector never shown to users at all. Multi-city mode swaps in a new `MultiCityLegEditor` (add/remove up to 6 legs, reusing the existing `AirportInput`/`DatePicker` per row rather than new pickers). Results page renders a dedicated N-leg view: a `MultiCityBundle` hero (combined total price, one row per leg, one combined Google Flights CTA) and "Flight 1..N" tabs generalizing the session-13 Outbound/Return pill pattern.
+- **Noted for later, not built**: the user's "eventually" idea of a ~100mi nearby-airport-radius search. `SearchLeg` deliberately stores a single `originAirport`/`destinationAirport` per leg as plain IATA strings — simple to extend later (e.g. an `alternateAirports: string[]` column) without a redesign, not worth speculative complexity now.
+
+**Live end-to-end verification** on `sparsh@server.local` with the user's actual trip (EWR↔LAS Jul 6–19, Jul 27–Aug 13, 4 legs): all 4 legs correctly stored and scraped (56 real flights, correctly tagged to their leg via `searchLegId`), comparison computed a real $786 total across the 4 cheapest legs, the combined booking URL decoded to field 19 = 3 with 4 leg entries (including real connecting-flight segments via MCO/DFW layovers), and the actual `SearchForm` UI (trip-type pills, leg editor, disabled-until-valid submit button) rendered and behaved correctly with zero console errors.
+
+**Files**: `packages/shared/src/enums.ts`, `types.ts`, `schemas.ts`; `packages/server/schema.sql`, `prisma/schema.prisma`, `src/types/db.ts`, `src/services/search.service.ts`, `src/jobs/search.job.ts`, `src/jobs/comparison.job.ts` (+ test), `src/utils/googleFlightsUrl.ts` (+ new test file), `src/services/flight.service.ts`, `src/services/comparison.service.ts`, `src/controllers/flights.controller.ts`, `src/routes/flights.routes.ts`; `packages/client/src/stores/searchStore.ts`, `src/components/search/SearchForm.tsx`, `MultiCityLegEditor.tsx` (new), `src/components/comparison/MultiCityBundle.tsx` (new), `src/pages/SearchResultsPage.tsx`, `src/api/search.api.ts`, `comparison.api.ts`, `flights.api.ts`, `src/hooks/useMultiCityBookingUrl.ts` (new)
+
+### Tests
+Server: 41 tests pass (`tsc --noEmit` clean, production `tsc` build clean) — 4 new flexible-dates tests, 2 new multi-city comparison tests, 3 new tfs-decode tests. Client: 41 tests pass (`tsc --noEmit` clean, production `vite build` clean).
+
+### Other fixes made while implementing
+While typing `SearchRequest.legs` through to the results page, discovered and fixed several client API functions (`getSearch`, `getComparison`, `getComparisonsByQuery`) that had no return-type annotation and were silently typed `any` throughout the app — not a session-14 bug exactly, but a real type-safety gap that the new multi-city fields would have silently fallen through. Now properly typed against the shared `SearchQuery`/`Comparison`/`ComparisonResponse` interfaces.
+
+### Outstanding Issues (as of end of session 14)
+1. Items 1–4 from session 13's outstanding list are unchanged (native macOS nginx on port 80, Ollama model mismatch, EmptyState/AdvancedFilters minor items, DOT BTS metro coverage gap).
+2. Nearby-airport-radius search (~100mi) — explicitly deferred per the user's own "eventually" framing; the data model leaves room for it without a redesign.
+3. None outstanding from this session's UI work — `DESIGN.md`'s component anatomy section was updated with `MultiCityBundle`/`MultiCityLegEditor`/trip-type-selector entries before closing out.

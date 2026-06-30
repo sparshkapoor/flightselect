@@ -93,6 +93,12 @@ Negative tracking is mandatory on `.text-display`/`.text-h1`/`.text-h2` — flat
 
 **Status badges / pills** (Direct, layover, Best price): `rounded-full`, small, `bg-{color}-500/10 text-{color}-400 border border-{color}-500/20` — the one place `rounded-full` is correct.
 
+**Multi-city hero (`MultiCityBundle.tsx`)** — same shell as `RoundTripBundle` (`surface-2`/`hairline-strong`, `.text-display` price, scrapedAt caption, brand-600 CTA) since it's always the sole hero (no demoted alternative exists for N legs). Differs only where it must: eyebrow reads `MULTI-CITY · N FLIGHTS` instead of an airline name, and the header's right side shows the full route as `EWR → LAS → EWR → LAS` (`font-mono`) instead of an airline chip. Each leg row gets its own small airline chip + name inline in the `Flight N` eyebrow, since legs can be different airlines.
+
+**Multi-city leg editor (`MultiCityLegEditor.tsx`)**: each leg is a `surface-1` + `hairline` card (`rounded-xl p-4`) — deliberately one depth step below the hero card's `surface-2`, since these are input rows, not a result — containing an eyebrow (`Flight N`) + a `Remove` text link (only shown past the 2-leg minimum), the existing `AirportInput` pair, and a `DatePicker`. `+ Add another flight` is a plain `text-brand-400` link below the stack, capped at 6 legs, matching the Expedia-style affordance the user asked for without inventing a new control.
+
+**Trip-type selector** (`SearchForm.tsx`): same segmented-pill pattern as the Outbound/Return and Flight-N tabs (`bg-surface-1 border border-hairline rounded-full p-1`, active `bg-surface-2 text-brand-400`) — one more place the surface-ladder-as-signal rule applies instead of inventing a new "selected" treatment.
+
 ## Motion (must be perceptible — this was the explicit complaint)
 
 A previous pass shipped "ambient blobs" that moved under 40px on a 384px blurred shape — invisible in practice. That doesn't count as motion. The bar: **if you watch the screen for 3 seconds you must be able to see it move**, full stop.
