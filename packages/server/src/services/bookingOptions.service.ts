@@ -24,14 +24,16 @@ const BOOKING_OPTIONS_TIMEOUT_MS = 12_000;
 // staying well under SerpAPI's concurrent-request tolerance.
 const BOOKING_OPTIONS_BATCH_CONCURRENCY = 4;
 
-interface SerpApiBookingOption {
+interface SerpApiBookingOptionTogether {
   book_with?: string;
   price?: number;
-  currency?: string;
-  together_price?: number;
-  baggage?: string;
+  baggage_prices?: string[];
   extensions?: string[];
-  options?: { url: string }[];
+  booking_request?: { url?: string };
+}
+
+interface SerpApiBookingOption {
+  together?: SerpApiBookingOptionTogether;
 }
 
 interface SerpApiBookingResponse {
@@ -122,13 +124,13 @@ export async function getBookingOptions(
 
   const raw = data.booking_options ?? [];
   const options: BookingOption[] = raw
-    .filter((o) => o.options?.[0]?.url)
+    .filter((o) => o.together?.booking_request?.url)
     .map((o) => ({
-      seller: o.book_with ?? 'Unknown',
-      price: o.price ?? o.together_price ?? 0,
-      currency: o.currency ?? 'USD',
-      url: o.options![0].url,
-      baggage: o.baggage,
+      seller: o.together!.book_with ?? 'Unknown',
+      price: o.together!.price ?? 0,
+      currency: 'USD',
+      url: o.together!.booking_request!.url!,
+      baggage: o.together!.baggage_prices?.join(', '),
     }));
 
   logger.info(
