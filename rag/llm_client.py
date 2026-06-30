@@ -24,6 +24,11 @@ def _ollama(system_prompt: str, user_content: str) -> str:
             ],
             max_tokens=2000,
             temperature=0.3,
+            # Ollama's OpenAI-compat layer defaults num_ctx to 4096 regardless of
+            # the model's actual trained context window — too small once the
+            # retrieved-chunk context grows past a few records. Passed per-request
+            # so this isn't dependent on server-side OLLAMA_CONTEXT_LENGTH config.
+            extra_body={"options": {"num_ctx": 8192}},
         )
         return resp.choices[0].message.content or ""
     except Exception as exc:
