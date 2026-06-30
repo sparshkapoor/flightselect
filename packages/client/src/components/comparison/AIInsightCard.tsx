@@ -6,11 +6,23 @@ interface AIInsightCardProps {
   comparison: Comparison;
   origin: string;
   destination: string;
+  /** Days between when the search was made and the actually-flown date —
+   *  absent on the standalone saved-comparison view, which has no SearchQuery. */
+  daysUntilDeparture?: number | null;
+  flexibleDatesUsed?: boolean;
+  flexibleDateRangeDays?: number | null;
 }
 
 type State = 'loading' | 'ready' | 'empty';
 
-export function AIInsightCard({ comparison, origin, destination }: AIInsightCardProps) {
+export function AIInsightCard({
+  comparison,
+  origin,
+  destination,
+  daysUntilDeparture,
+  flexibleDatesUsed,
+  flexibleDateRangeDays,
+}: AIInsightCardProps) {
   const [state, setState] = useState<State>('loading');
   const [insight, setInsight] = useState('');
 
@@ -19,12 +31,19 @@ export function AIInsightCard({ comparison, origin, destination }: AIInsightCard
     const cheaper = hasRoundTrip
       ? Math.min(Number(comparison.roundTripTotalPrice), Number(comparison.oneWayTotalPrice))
       : Number(comparison.oneWayTotalPrice);
+    const bookingWindowClause =
+      daysUntilDeparture != null
+        ? ` This search was made ${daysUntilDeparture} day${daysUntilDeparture === 1 ? '' : 's'} before departure` +
+          (flexibleDatesUsed
+            ? `, with flexible dates already enabled (±${flexibleDateRangeDays ?? 'several'} days).`
+            : ', without flexible dates enabled.')
+        : '';
     const question = hasRoundTrip
       ? `${origin} to ${destination}: same-airline $${Number(comparison.roundTripTotalPrice).toFixed(0)}, ` +
         `mix-and-match $${Number(comparison.oneWayTotalPrice).toFixed(0)}. ` +
-        `Is $${cheaper.toFixed(0)} a good price for this route?`
+        `Is $${cheaper.toFixed(0)} a good price for this route?${bookingWindowClause}`
       : `${origin} to ${destination}: $${cheaper.toFixed(0)} one-way, no return flights found. ` +
-        `Is $${cheaper.toFixed(0)} a good price for this route?`;
+        `Is $${cheaper.toFixed(0)} a good price for this route?${bookingWindowClause}`;
 
     const attempt = (retriesLeft: number) => {
       queryRag(question, 'comparison', origin, destination).then((answer) => {

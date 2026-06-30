@@ -46,6 +46,34 @@ describe('AIInsightCard', () => {
     expect(queryRag).toHaveBeenCalledWith(expect.any(String), 'comparison', 'JFK', 'LAX');
   });
 
+  it('includes the booking-window context in the question when provided', async () => {
+    vi.mocked(queryRag).mockResolvedValueOnce('Booked early, so this is a fair price.');
+
+    render(
+      <AIInsightCard
+        comparison={makeComparison()}
+        origin="JFK"
+        destination="LAX"
+        daysUntilDeparture={2}
+        flexibleDatesUsed={false}
+      />
+    );
+
+    await screen.findByText(/fair price/i);
+    expect(queryRag).toHaveBeenCalledWith(
+      expect.stringContaining('2 days before departure'),
+      'comparison',
+      'JFK',
+      'LAX'
+    );
+    expect(queryRag).toHaveBeenCalledWith(
+      expect.stringContaining('without flexible dates enabled'),
+      'comparison',
+      'JFK',
+      'LAX'
+    );
+  });
+
   it('hides itself rather than showing a raw fallback sentence when RAG has no data scoped to this route yet', async () => {
     vi.useFakeTimers();
     vi.mocked(queryRag).mockResolvedValue(null);

@@ -1,8 +1,15 @@
 import { queryOne } from '../config/database';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
+import { cacheService } from './cache.service';
 import type { BookingOption } from '@flightselect/shared';
 import { DbFlight } from '../types/db';
+
+// Booking-options pricing/sellers are more volatile than flight search
+// results — a short TTL trades a little staleness for real SerpAPI quota
+// savings (free tier: 100 searches/month) when the same already-scraped
+// flight is viewed again (repeat clicks, multiple users, batch eager-load).
+const BOOKING_OPTIONS_CACHE_TTL = 15 * 60;
 
 interface SerpApiBookingOption {
   book_with?: string;
@@ -56,6 +63,12 @@ export async function getBookingOptions(
     return { options: [], message: 'SerpAPI not configured' };
   }
 
+  const cacheKey = `booking-options:${flightId}`;
+  const cached = await cacheService.get<{ options: BookingOption[]; googleFlightsUrl?: string }>(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
   // Look up the search query for trip type and return date — SerpAPI requires
   // departure_id/arrival_id/outbound_date (and return_date for round trips) alongside booking_token.
   const outboundDate = new Date(flight.departureTime).toISOString().slice(0, 10);
@@ -84,6 +97,11 @@ export async function getBookingOptions(
 
   const data = (await res.json()) as SerpApiBookingResponse;
 
+  if (data.error) {
+    logger.warn({ flightId, serpApiError: data.error }, 'SerpAPI returned an error for booking options');
+    return { options: [], message: `Booking lookup failed: ${data.error}` };
+  }
+
   const googleFlightsUrl = data.search_metadata?.google_flights_url ?? undefined;
 
   const raw = data.booking_options ?? [];
@@ -102,5 +120,10 @@ export async function getBookingOptions(
     'Booking options fetched'
   );
 
-  return { options, googleFlightsUrl };
+  const result = { options, googleFlightsUrl };
+  // Only cache a genuine SerpAPI result (populated or genuinely empty) — never
+  // cache the error/message branches above, so a transient SerpAPI error or
+  // quota blip doesn't get frozen into a false "unavailable" for 15 minutes.
+  await cacheService.set(cacheKey, result, BOOKING_OPTIONS_CACHE_TTL);
+  return result;
 }

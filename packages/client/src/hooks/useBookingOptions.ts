@@ -16,10 +16,10 @@ export function useBookingOptions(flightId: string) {
       const data = await res.json();
       if (!res.ok) throw Object.assign(new Error(data.message ?? 'Failed'), { status: res.status, data });
       const fetched: BookingOption[] = data.options ?? [];
-      if (fetched.length === 0 && data.message) {
-        throw new Error(data.message);
-      }
       setOptions(fetched);
+      if (data.message) {
+        setError(data.message);
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load booking options');
     } finally {

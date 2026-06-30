@@ -63,7 +63,7 @@ export function FlightTimeline({
       </div>
 
       {/* Row 3: stop badge */}
-      <div className="flex justify-center">
+      <div className="flex justify-center mt-1">
         <LayoverBadge
           isLayover={isLayover}
           layoverAirport={layoverAirport}

@@ -283,6 +283,9 @@ export function SearchResultsPage() {
                 ).filter((f): f is Flight => !!f) ?? []}
                 allOutboundFlights={outboundFlights}
                 allReturnFlights={returnFlights}
+                flexibleDatesUsed={searchData?.flexibleDates}
+                flexibleDateRangeDays={searchData?.flexibleDateRangeDays}
+                searchCreatedAt={searchData?.createdAt}
               />
             ) : null}
 

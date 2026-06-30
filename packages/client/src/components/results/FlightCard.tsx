@@ -129,13 +129,15 @@ export function FlightCard({
           <>
             <button
               onClick={handleViewOptions}
-              disabled={loadingOptions || (bookingOptions !== null && bookingOptions.length > 0)}
+              disabled={loadingOptions || bookingOptions !== null}
               className="mt-1.5 text-xs text-brand-400 hover:text-brand-300 font-semibold hover:underline disabled:opacity-50"
             >
               {loadingOptions
                 ? 'Loading...'
                 : bookingOptions !== null && bookingOptions.length > 0
                 ? 'Sellers loaded'
+                : bookingOptions !== null && bookingOptions.length === 0 && optionsError
+                ? 'Unavailable'
                 : bookingOptions !== null && bookingOptions.length === 0
                 ? 'No sellers found'
                 : 'View booking options'}

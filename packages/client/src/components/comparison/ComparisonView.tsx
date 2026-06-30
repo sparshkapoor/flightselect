@@ -22,6 +22,11 @@ interface ComparisonViewProps {
    *  Optional: the standalone saved-comparison view doesn't have these. */
   allOutboundFlights?: Flight[];
   allReturnFlights?: Flight[];
+  /** SearchQuery context for the AI Insight's booking-window reasoning.
+   *  Absent on the standalone saved-comparison view, which has no SearchQuery. */
+  flexibleDatesUsed?: boolean;
+  flexibleDateRangeDays?: number | null;
+  searchCreatedAt?: string;
 }
 
 export function ComparisonView({
@@ -31,6 +36,9 @@ export function ComparisonView({
   oneWayReturnFlights,
   allOutboundFlights = [],
   allReturnFlights = [],
+  flexibleDatesUsed,
+  flexibleDateRangeDays,
+  searchCreatedAt,
 }: ComparisonViewProps) {
   const origin =
     oneWayOutboundFlights[0]?.departureAirport ?? roundTripFlights[0]?.departureAirport ?? '';
@@ -85,6 +93,19 @@ export function ComparisonView({
     ? `${origin} → ${destination}${tripDateRange ? ` · ${tripDateRange}` : ''}`
     : null;
 
+  // Days between when the search was made and the actually-flown date (which
+  // flexible dates can shift away from what was originally requested) — lets
+  // the AI Insight reason about booking-window proximity. Clamp negative
+  // values (clock skew / edge cases) to null rather than passing nonsense.
+  const flownDepartureTime = hasRoundTrip ? rtOutbound.departureTime : bestOutbound?.departureTime;
+  const daysUntilDeparture = (() => {
+    if (!flownDepartureTime || !searchCreatedAt) return null;
+    const days = Math.round(
+      (new Date(flownDepartureTime).getTime() - new Date(searchCreatedAt).getTime()) / 86_400_000
+    );
+    return days >= 0 ? days : null;
+  })();
+
   const tiedCountFor = (flight: Flight | undefined, allLegFlights: Flight[]): number =>
     flight ? countTiedAtPrice(allLegFlights, flight.id, Number(flight.price)) : 0;
 
@@ -106,7 +127,14 @@ export function ComparisonView({
 
         {origin && destination && (
           <div className="animate-fadeInUp" style={{ animationDelay: '60ms' }}>
-            <AIInsightCard comparison={comparison} origin={origin} destination={destination} />
+            <AIInsightCard
+              comparison={comparison}
+              origin={origin}
+              destination={destination}
+              daysUntilDeparture={daysUntilDeparture}
+              flexibleDatesUsed={flexibleDatesUsed}
+              flexibleDateRangeDays={flexibleDateRangeDays}
+            />
           </div>
         )}
 
@@ -152,7 +180,14 @@ export function ComparisonView({
 
       {origin && destination && (
         <div className="animate-fadeInUp" style={{ animationDelay: '60ms' }}>
-          <AIInsightCard comparison={comparison} origin={origin} destination={destination} />
+          <AIInsightCard
+            comparison={comparison}
+            origin={origin}
+            destination={destination}
+            daysUntilDeparture={daysUntilDeparture}
+            flexibleDatesUsed={flexibleDatesUsed}
+            flexibleDateRangeDays={flexibleDateRangeDays}
+          />
         </div>
       )}
 
