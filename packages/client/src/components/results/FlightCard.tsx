@@ -168,21 +168,20 @@ export function FlightCard({
           </div>
         ) : (
           <>
-            <button
-              onClick={handleViewOptions}
-              disabled={loadingOptions || bookingOptions !== null}
-              className="mt-1.5 text-xs text-brand-400 hover:text-brand-300 font-semibold hover:underline disabled:opacity-50"
-            >
-              {loadingOptions
-                ? 'Checking sellers...'
-                : bookingOptions !== null && bookingOptions.length > 0
-                ? 'Sellers loaded'
-                : bookingOptions !== null && bookingOptions.length === 0 && optionsError
-                ? 'Error checking sellers'
-                : bookingOptions !== null && bookingOptions.length === 0
-                ? 'No sellers found'
-                : 'View booking options'}
-            </button>
+            {bookingOptions === null && (
+              <button
+                onClick={handleViewOptions}
+                disabled={loadingOptions}
+                className="mt-1.5 text-xs text-brand-400 hover:text-brand-300 font-semibold hover:underline disabled:opacity-50"
+              >
+                {loadingOptions ? 'Checking sellers...' : 'View booking options'}
+              </button>
+            )}
+            {bookingOptions !== null && bookingOptions.length === 0 && (
+              <div className="mt-1.5 text-xs text-ink-faint">
+                {optionsError ? 'Error checking sellers' : 'No sellers found'}
+              </div>
+            )}
             <button
               onClick={handleBookingClick}
               className="mt-1 text-xs text-ink-faint hover:text-ink-cool hover:underline"
@@ -191,19 +190,48 @@ export function FlightCard({
             </button>
             {bookingOptions !== null && bookingOptions.length > 0 && (
               <div className="mt-1.5 space-y-1 text-left">
-                {bookingOptions.map((opt, i) => (
-                  <a
-                    key={i}
-                    href={opt.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="flex justify-between items-center text-xs text-brand-400 hover:underline"
-                  >
-                    <span>{opt.seller}</span>
-                    <span className="ml-2 font-semibold font-mono">${opt.price}</span>
-                  </a>
-                ))}
+                <a
+                  href={bookingOptions[0].url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="block w-full text-center bg-brand-600 hover:bg-brand-700 text-white font-medium text-sm py-2 rounded-lg transition-all duration-150 hover:-translate-y-px hover:scale-[1.015]"
+                >
+                  Book on {bookingOptions[0].seller} →
+                </a>
+                {bookingOptions.length > 1 && (
+                  <div className="text-center">
+                    {showMoreOptions ? (
+                      <div className="space-y-0.5">
+                        {bookingOptions.slice(1).map((opt, i) => (
+                          <a
+                            key={i}
+                            href={opt.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="block w-full text-center text-xs text-ink-faint hover:text-ink py-1 hover:underline underline-offset-2"
+                          >
+                            {opt.seller}{opt.price ? ` — $${opt.price}` : ''}
+                          </a>
+                        ))}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setShowMoreOptions(false); }}
+                          className="text-xs text-ink-faint hover:text-ink-cool underline-offset-2 hover:underline"
+                        >
+                          Show less
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setShowMoreOptions(true); }}
+                        className="text-xs text-ink-faint hover:text-ink-cool underline-offset-2 hover:underline"
+                      >
+                        +{bookingOptions.length - 1} more options
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </>
