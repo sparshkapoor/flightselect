@@ -99,18 +99,31 @@ export function FlightCard({
             {loadingOptions && <div className="text-xs text-ink-faint text-right">Checking sellers...</div>}
             {!loadingOptions && bookingOptions !== null && bookingOptions.length > 0 && (
               <div className="space-y-1 text-left">
-                {bookingOptions.map((opt, i) => (
-                  <a
-                    key={i}
-                    href={opt.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="block w-full text-center bg-brand-600 hover:bg-brand-700 text-white font-medium text-sm py-2 rounded-lg transition-all duration-150 hover:-translate-y-px hover:scale-[1.015]"
-                  >
-                    Book on {opt.seller} →
-                  </a>
-                ))}
+                <a
+                  href={bookingOptions[0].url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="block w-full text-center bg-brand-600 hover:bg-brand-700 text-white font-medium text-sm py-2 rounded-lg transition-all duration-150 hover:-translate-y-px hover:scale-[1.015]"
+                >
+                  Book on {bookingOptions[0].seller} →
+                </a>
+                {bookingOptions.length > 1 && (
+                  <div className="max-h-24 overflow-y-auto space-y-0.5">
+                    {bookingOptions.slice(1).map((opt, i) => (
+                      <a
+                        key={i}
+                        href={opt.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="block w-full text-center text-xs text-ink-faint hover:text-ink py-1 hover:underline underline-offset-2"
+                      >
+                        {opt.seller}{opt.price ? ` — $${opt.price}` : ''}
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
             {!loadingOptions && bookingOptions !== null && bookingOptions.length > 0 ? (
