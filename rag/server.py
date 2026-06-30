@@ -14,7 +14,7 @@ from pydantic import BaseModel, field_validator
 
 from rag import config as cfg
 from rag.embedder import embed
-from rag.query import query
+from rag.query import query, query_knowledge
 from rag.vectorstore import ingest as vs_ingest
 
 logging.basicConfig(
@@ -173,6 +173,47 @@ async def handle_query(req: QueryRequest) -> QueryResponse:
     except Exception as exc:
         logger.error("Query failed: %s: %s", type(exc).__name__, exc)
         raise HTTPException(status_code=500, detail="Query failed")
+
+
+class KnowledgeRequest(BaseModel):
+    itinerary_summary: str
+    airlines: list[str] = []
+
+    @field_validator("itinerary_summary")
+    @classmethod
+    def summary_not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("itinerary_summary must not be empty")
+        return v.strip()
+
+
+class KnowledgeResponse(BaseModel):
+    answer: str
+    as_of: str
+    stale: bool
+
+
+@app.post("/knowledge", response_model=KnowledgeResponse, dependencies=[Depends(_verify_secret)])
+async def handle_knowledge(req: KnowledgeRequest) -> KnowledgeResponse:
+    # Cache on the full itinerary+airline signature so identical comparisons
+    # don't re-hit the LLM. Reuses the same TTL cache as /query.
+    key = _cache_key(f"{req.itinerary_summary}|{','.join(sorted(req.airlines))}", "knowledge")
+    cached = _get_cached(key)
+    if cached is not None:
+        logger.info("Cache hit for knowledge question")
+        return KnowledgeResponse.model_validate_json(cached)
+
+    try:
+        result = query_knowledge(req.itinerary_summary, req.airlines)
+        resp = KnowledgeResponse(**result)
+        # Don't cache the "not ready" sentinel — knowledge ingestion may land
+        # moments later (cold boot), same rationale as /query.
+        if resp.answer.strip().lower() != "insufficient data":
+            _set_cached(key, resp.model_dump_json())
+        return resp
+    except Exception as exc:
+        logger.error("Knowledge query failed: %s: %s", type(exc).__name__, exc)
+        raise HTTPException(status_code=500, detail="Knowledge query failed")
 
 
 @app.get("/health")

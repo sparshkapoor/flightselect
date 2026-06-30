@@ -58,3 +58,22 @@ def retrieve(
     docs: list[str] = (results.get("documents") or [[]])[0]
     logger.info("Retrieved %d documents (where=%s)", len(docs), where)
     return docs
+
+
+def retrieve_with_metadata(
+    query_embedding: list[float],
+    n_results: int | None = None,
+    where: dict | None = None,
+) -> list[tuple[str, dict]]:
+    """Like retrieve(), but pairs each document with its metadata.
+
+    Used by knowledge retrieval, which needs each chunk's as_of/review_after to
+    compute and surface freshness alongside the answer.
+    """
+    n = n_results if n_results is not None else config.RETRIEVE_N
+    col = _collection()
+    results = col.query(query_embeddings=[query_embedding], n_results=n, where=where)
+    docs: list[str] = (results.get("documents") or [[]])[0]
+    metas: list[dict] = (results.get("metadatas") or [[]])[0]
+    logger.info("Retrieved %d documents w/ metadata (where=%s)", len(docs), where)
+    return list(zip(docs, metas))

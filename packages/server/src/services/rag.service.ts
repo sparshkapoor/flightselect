@@ -37,3 +37,37 @@ export async function queryRag(
     return null;
   }
 }
+
+export interface KnowledgeInsight {
+  answer: string;
+  asOf: string;
+  stale: boolean;
+}
+
+export async function queryKnowledge(
+  itinerarySummary: string,
+  airlines: string[] = []
+): Promise<KnowledgeInsight | null> {
+  try {
+    const res = await fetch(`${RAG_BASE_URL}/knowledge`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(env.RAG_INTERNAL_SECRET ? { 'X-RAG-Secret': env.RAG_INTERNAL_SECRET } : {}),
+      },
+      body: JSON.stringify({ itinerary_summary: itinerarySummary, airlines }),
+      signal: AbortSignal.timeout(120_000),
+    });
+
+    if (!res.ok) {
+      logger.warn({ status: res.status }, 'RAG knowledge returned non-200');
+      return null;
+    }
+
+    const data = (await res.json()) as { answer: string; as_of: string; stale: boolean };
+    return { answer: data.answer, asOf: data.as_of, stale: data.stale };
+  } catch (err) {
+    logger.warn({ err }, 'RAG knowledge service unreachable');
+    return null;
+  }
+}

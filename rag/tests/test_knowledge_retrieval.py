@@ -54,3 +54,28 @@ def test_reingest_replaces_chunks_in_place_no_duplicates():
     count_after_first = _collection().count()
     ingest_doc(DOCS_DIR / "points-miles.md")  # re-run
     assert _collection().count() == count_after_first, "re-ingest must upsert, not duplicate"
+
+
+def test_query_knowledge_returns_freshness_and_flags_stale(monkeypatch):
+    from datetime import date
+
+    import rag.query as q
+
+    monkeypatch.setattr(q, "complete", lambda system, user: "Delta Amex waives the first bag.")
+    ingest_doc(DOCS_DIR / "credit-cards.md")  # as_of 2025-08, review_after 2025-11
+
+    fresh = q.query_knowledge("JFK to LAX on Delta", ["Delta"], today=date(2025, 9, 1))
+    assert fresh["as_of"] == "2025-08"
+    assert fresh["stale"] is False
+
+    stale = q.query_knowledge("JFK to LAX on Delta", ["Delta"], today=date(2026, 6, 30))
+    assert stale["stale"] is True, "past review_after must flag stale"
+
+
+def test_query_knowledge_insufficient_data_on_empty_store():
+    from datetime import date
+
+    import rag.query as q
+
+    out = q.query_knowledge("JFK to LAX", today=date(2026, 6, 30))
+    assert out == {"answer": "insufficient data", "as_of": "", "stale": False}

@@ -6,6 +6,7 @@ import { MixAndMatchSection } from './MixAndMatchSection';
 import { PriceComparisonChart } from './PriceComparisonChart';
 import { ComparisonTable } from './ComparisonTable';
 import { AIInsightCard } from './AIInsightCard';
+import { TravelIntelligenceCard } from './TravelIntelligenceCard';
 import { useRoundTripBookingUrl } from '../../hooks/useRoundTripBookingUrl';
 import { useBatchBookingOptions } from '../../hooks/useBatchBookingOptions';
 import { formatFlightDate } from '../../utils/formatters';
@@ -109,7 +110,18 @@ export function ComparisonView({
           </div>
         )}
 
-        <div className="animate-fadeInUp" style={{ animationDelay: '120ms' }}>
+        {origin && destination && (
+          <div className="animate-fadeInUp" style={{ animationDelay: '120ms' }}>
+            <TravelIntelligenceCard
+              comparison={comparison}
+              origin={origin}
+              destination={destination}
+              flights={[bestOutbound]}
+            />
+          </div>
+        )}
+
+        <div className="animate-fadeInUp" style={{ animationDelay: '180ms' }}>
           <RoundTripBundle
             outboundFlight={bestOutbound}
             returnFlight={null}
@@ -144,9 +156,22 @@ export function ComparisonView({
         </div>
       )}
 
+      {origin && destination && (
+        <div className="animate-fadeInUp" style={{ animationDelay: '120ms' }}>
+          <TravelIntelligenceCard
+            comparison={comparison}
+            origin={origin}
+            destination={destination}
+            flights={[rtOutbound, rtReturn, oneWayOutboundFlights[0], oneWayReturnFlights[0]].filter(
+              (f): f is Flight => Boolean(f)
+            )}
+          />
+        </div>
+      )}
+
       {isRoundTripCheapest ? (
         <>
-          <div className="animate-fadeInUp" style={{ animationDelay: '120ms' }}>
+          <div className="animate-fadeInUp" style={{ animationDelay: '180ms' }}>
             <RoundTripBundle
               outboundFlight={rtOutbound}
               returnFlight={rtReturn}
@@ -163,7 +188,7 @@ export function ComparisonView({
           </div>
 
           {oneWayOutboundFlights[0] && oneWayReturnFlights[0] && (
-            <div className="animate-fadeInUp" style={{ animationDelay: '180ms' }}>
+            <div className="animate-fadeInUp" style={{ animationDelay: '240ms' }}>
               <div className="flex items-center gap-3 my-10">
                 <div className="flex-1 h-px bg-hairline" />
                 <span className="text-eyebrow text-ink-faint shrink-0">or mix airlines</span>
@@ -188,7 +213,7 @@ export function ComparisonView({
       ) : (
         <>
           {oneWayOutboundFlights[0] && oneWayReturnFlights[0] && (
-            <div className="animate-fadeInUp" style={{ animationDelay: '120ms' }}>
+            <div className="animate-fadeInUp" style={{ animationDelay: '180ms' }}>
               <MixAndMatchSection
                 outboundFlight={oneWayOutboundFlights[0]}
                 returnFlight={oneWayReturnFlights[0]}
@@ -205,7 +230,7 @@ export function ComparisonView({
             </div>
           )}
 
-          <div className="animate-fadeInUp" style={{ animationDelay: '180ms' }}>
+          <div className="animate-fadeInUp" style={{ animationDelay: '240ms' }}>
             <div className="flex items-center gap-3 my-10">
               <div className="flex-1 h-px bg-hairline" />
               <span className="text-eyebrow text-ink-faint shrink-0">or same airline</span>
