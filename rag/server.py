@@ -48,6 +48,16 @@ def _set_cached(key: str, answer: str) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Seed the knowledge base (credit-card / points docs) on boot. Idempotent
+    # (stable ids + upsert), so it's safe to run every start; the persistent
+    # chroma volume keeps it warm. Non-fatal — flight queries must still work
+    # even if knowledge ingestion fails.
+    try:
+        from rag.ingest_docs import main as ingest_docs
+
+        ingest_docs()
+    except Exception as exc:  # noqa: BLE001 — boot must not fail on this
+        logger.warning("Knowledge-doc ingestion failed at startup: %s: %s", type(exc).__name__, exc)
     logger.info("RAG server ready")
     yield
 
@@ -100,6 +110,7 @@ async def handle_ingest(req: IngestRequest) -> IngestResponse:
     ]
     metadatas = [
         {
+            "kind": "flight",
             "origin": f.origin,
             "destination": f.destination,
             "date": f.date,

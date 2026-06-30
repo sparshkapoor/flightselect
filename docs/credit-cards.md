@@ -1,3 +1,12 @@
+---
+doc_type: cards
+as_of: 2025-08
+review_after: 2025-11
+sources:
+  - thepointsguy.com
+  - card issuer benefit terms (Amex, Chase, BofA, Citi)
+---
+
 # Credit Card Bag Benefits — Reference
 
 ## Verified Card Benefits (2025)

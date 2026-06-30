@@ -70,6 +70,7 @@ def ingest_file(csv_path: str) -> int:
             documents.append(doc)
             ids.append(f"{path.stem}-{i}")
             metadatas.append({
+                "kind": "flight",
                 "origin": row["origin"],
                 "destination": row["destination"],
                 "date": row["date"],

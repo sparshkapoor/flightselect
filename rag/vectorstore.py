@@ -32,7 +32,12 @@ def ingest(
     col = _collection()
     for start in range(0, len(documents), _MAX_BATCH_SIZE):
         end = start + _MAX_BATCH_SIZE
-        col.add(
+        # upsert (not add) so callers with stable ids — e.g. the knowledge-doc
+        # ingest, where re-running on an edited doc must replace the chunk in
+        # place rather than error on a duplicate id — are idempotent. The flight
+        # paths use unique time/search-id-based ids, so upsert behaves like add
+        # for them.
+        col.upsert(
             documents=documents[start:end],
             embeddings=embeddings[start:end],
             ids=ids[start:end],

@@ -1,3 +1,12 @@
+---
+doc_type: points
+as_of: 2025-07
+review_after: 2025-10
+sources:
+  - thepointsguy.com/guide/monthly-valuations/
+  - upgradedpoints.com/travel/best-credit-card-points-valuations/
+---
+
 # Points & Miles — Reference
 
 ## CPP Valuations (2025)
