@@ -2,6 +2,7 @@ import type { Flight, BookingOption } from '@flightselect/shared';
 import { FlightTimeline } from '../results/FlightTimeline';
 import { airlineInitials, airlineColor } from '../../utils/airlineBadge';
 import { formatPriceDifference, formatScrapedAt } from '../../utils/formatters';
+import { openBooking } from '../../utils/openBooking';
 
 interface RoundTripBundleProps {
   outboundFlight: Flight;
@@ -66,15 +67,12 @@ function LegRow({ flight, direction, options, loading, message, tiedCount = 0 }:
         {loading ? (
           <div className="text-xs text-ink-faint">Checking sellers...</div>
         ) : topOption ? (
-          <a
-            href={topOption.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
+          <button
+            onClick={(e) => { e.stopPropagation(); openBooking(topOption); }}
             className="text-xs text-brand-400 hover:text-brand-300 font-medium hover:underline"
           >
             Book on {topOption.seller} →
-          </a>
+          </button>
         ) : (
           <>
             {checked && (

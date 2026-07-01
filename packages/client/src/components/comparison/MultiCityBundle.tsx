@@ -2,6 +2,7 @@ import type { Flight, BookingOption } from '@flightselect/shared';
 import { FlightTimeline } from '../results/FlightTimeline';
 import { airlineInitials, airlineColor } from '../../utils/airlineBadge';
 import { formatScrapedAt } from '../../utils/formatters';
+import { openBooking } from '../../utils/openBooking';
 
 interface LegRowProps {
   flight: Flight;
@@ -48,15 +49,12 @@ function LegRow({ flight, legNumber, options, loading }: LegRowProps) {
         {loading ? (
           <div className="h-3 w-20 skeleton mt-0.5" />
         ) : topOption ? (
-          <a
-            href={topOption.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
+          <button
+            onClick={(e) => { e.stopPropagation(); openBooking(topOption); }}
             className="text-xs text-brand-400 hover:text-brand-300 font-medium hover:underline"
           >
             Book on {topOption.seller} →
-          </a>
+          </button>
         ) : (
           <button
             onClick={handleViewGoogle}

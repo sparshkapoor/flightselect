@@ -164,5 +164,6 @@ export interface BookingOption {
   price: number;
   currency: string;
   url: string;
+  postData?: string;
   baggage?: string;
 }

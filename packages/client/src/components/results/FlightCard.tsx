@@ -7,6 +7,7 @@ import { CABIN_CLASS_LABELS } from '../../utils/constants';
 import { useBookingOptions } from '../../hooks/useBookingOptions';
 import { airlineInitials, airlineColor } from '../../utils/airlineBadge';
 import { formatTime } from '../../utils/formatters';
+import { openBooking } from '../../utils/openBooking';
 
 interface FlightCardProps {
   flight: Flight;
@@ -65,12 +66,10 @@ function BookingOptionsModal({
         {/* Options list */}
         <div className="px-3 py-2 max-h-72 overflow-y-auto">
           {sorted.map((opt, i) => (
-            <a
+            <button
               key={i}
-              href={opt.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-2 transition-colors group"
+              onClick={() => openBooking(opt)}
+              className="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-2 transition-colors group text-left"
             >
               <span className="text-sm font-medium text-ink group-hover:text-brand-300 transition-colors">
                 {opt.seller}
@@ -83,7 +82,7 @@ function BookingOptionsModal({
                   Book →
                 </span>
               </div>
-            </a>
+            </button>
           ))}
         </div>
 
@@ -193,15 +192,12 @@ export function FlightCard({
               )}
               {hasOptions && primaryOption && (
                 <>
-                  <a
-                    href={primaryOption.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); openBooking(primaryOption!); }}
                     className="block w-full text-center bg-brand-600 hover:bg-brand-700 text-white font-medium text-sm px-4 py-2.5 rounded-xl transition-all duration-150 hover:-translate-y-px hover:scale-[1.015]"
                   >
                     Book on {primaryOption.seller} →
-                  </a>
+                  </button>
                   {bookingOptions!.length > 1 && (
                     <button
                       onClick={(e) => { e.stopPropagation(); setShowModal(true); }}
@@ -242,15 +238,12 @@ export function FlightCard({
               )}
               {hasOptions && primaryOption && (
                 <>
-                  <a
-                    href={primaryOption.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); openBooking(primaryOption!); }}
                     className="block w-full text-center bg-brand-600 hover:bg-brand-700 text-white font-medium text-sm px-4 py-2.5 rounded-xl transition-all duration-150 hover:-translate-y-px hover:scale-[1.015]"
                   >
                     Book on {primaryOption.seller} →
-                  </a>
+                  </button>
                   {bookingOptions!.length > 1 && (
                     <button
                       onClick={(e) => { e.stopPropagation(); setShowModal(true); }}

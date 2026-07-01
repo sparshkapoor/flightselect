@@ -29,7 +29,7 @@ interface SerpApiBookingOptionTogether {
   price?: number;
   baggage_prices?: string[];
   extensions?: string[];
-  booking_request?: { url?: string };
+  booking_request?: { url?: string; post_data?: string };
 }
 
 interface SerpApiBookingOption {
@@ -130,6 +130,7 @@ export async function getBookingOptions(
       price: o.together!.price ?? 0,
       currency: 'USD',
       url: o.together!.booking_request!.url!,
+      postData: o.together!.booking_request!.post_data ?? undefined,
       baggage: o.together!.baggage_prices?.join(', '),
     }));
 
